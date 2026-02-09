@@ -1,0 +1,354 @@
+/* Animații și tranziții globale */
+* {
+  transition: all 0.3s ease;
+}
+
+/* Animație fade-in pentru pagini */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-content {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Hover pe butoane */
+.btn-primary {
+  background-color: #0066cc;
+  color: white;
+  border: none;
+  padding: 15px 40px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background-color: #0052a3;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 102, 204, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Hover pe butoane secundare */
+.btn-secondary {
+  background-color: white;
+  color: #0066cc;
+  border: 2px solid #0066cc;
+  padding: 15px 40px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background-color: #0066cc;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 102, 204, 0.2);
+}
+
+/* Hover pe carduri de pricing */
+.pricing-card {
+  background-color: white;
+  padding: 40px 30px;
+  border-radius: 10px;
+  text-align: center;
+  border: 2px solid #e0e0e0;
+  transition: all 0.3s ease;
+}
+
+.pricing-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border-color: #0066cc;
+}
+
+.pricing-card-pro {
+  background-color: #0066cc;
+  color: white;
+  padding: 40px 30px;
+  border-radius: 10px;
+  text-align: center;
+  transform: scale(1.05);
+  box-shadow: 0 10px 40px rgba(0, 102, 204, 0.3);
+  transition: all 0.3s ease;
+}
+
+.pricing-card-pro:hover {
+  transform: scale(1.08);
+  box-shadow: 0 15px 50px rgba(0, 102, 204, 0.4);
+}
+
+/* Hover pe features */
+.feature-card {
+  text-align: center;
+  transition: all 0.3s ease;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+  background-color: #f8f9fa;
+}
+
+.feature-icon {
+  width: 80px;
+  height: 80px;
+  background-color: #0066cc;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover .feature-icon {
+  background-color: #0052a3;
+  transform: rotate(10deg) scale(1.1);
+}
+
+/* Hover pe link-uri din meniu */
+.nav-link {
+  color: white;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  padding: 5px 0;
+  position: relative;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: #0066cc;
+  transition: width 0.3s ease;
+}
+
+.nav-link:hover::after {
+  width: 100%;
+}
+
+.nav-link-active {
+  color: #0066cc;
+  font-weight: bold;
+}
+
+/* Hover pe logo */
+.logo {
+  margin: 0;
+  font-size: 28px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.logo:hover {
+  color: #0066cc;
+  transform: scale(1.05);
+}
+
+/* Input styles cu focus */
+input, textarea {
+  width: 100%;
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+input:focus, textarea:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+/* Responsive pentru mobile și tablete */
+@media (max-width: 1024px) {
+  .grid-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Grid-uri devin 1 coloană */
+  .grid-3, .grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Header stack vertical */
+  header {
+    flex-direction: column !important;
+    gap: 20px;
+    padding: 20px 20px !important;
+  }
+  
+  /* Navigare verticală */
+  nav {
+    flex-direction: column !important;
+    gap: 15px !important;
+    width: 100%;
+    text-align: center;
+  }
+  
+  /* Hero text mai mic */
+  h2 {
+    font-size: 32px !important;
+  }
+  
+  /* Secțiuni padding mai mic */
+  section {
+    padding: 40px 20px !important;
+  }
+  
+  /* Pricing cards fără scale pe Pro */
+  .pricing-card-pro {
+    transform: scale(1) !important;
+  }
+  
+  .pricing-card-pro:hover {
+    transform: scale(1.02) !important;
+  }
+  
+  /* Footer mai compact */
+  footer {
+    padding: 40px 20px 20px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Text și mai mic pe telefoane mici */
+  h1 {
+    font-size: 24px !important;
+  }
+  
+  h2 {
+    font-size: 28px !important;
+  }
+  
+  .btn-primary {
+    padding: 12px 20px !important;
+    font-size: 16px !important;
+  }
+}
+
+/* Smooth scroll global */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Scroll to top button */
+.scroll-to-top {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 50px;
+  height: 50px;
+  background-color: #0066cc;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.scroll-to-top.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.scroll-to-top:hover {
+  background-color: #0052a3;
+  transform: translateY(-5px);
+}
+
+/* Skeleton loading animation */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+  border-radius: 8px;
+}
+
+/* Pulse animation pentru butoane loading */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Fade and slide up pentru noi elemente */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.6s ease-out;
+}
+
+/* Stagger animation pentru liste */
+.stagger-item {
+  opacity: 0;
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+.stagger-item:nth-child(1) { animation-delay: 0.1s; }
+.stagger-item:nth-child(2) { animation-delay: 0.2s; }
+.stagger-item:nth-child(3) { animation-delay: 0.3s; }
+.stagger-item:nth-child(4) { animation-delay: 0.4s; }
