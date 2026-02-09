@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import './App.css'
-import Login from './components/Login'
-import Register from './components/Register'
-import Dashboard from './components/Dashboard'
+import Login from './components/Login.jsx'
+import Register from './components/Register.jsx'
+import Dashboard from './components/Dashboard.jsx'
 
 function App() {
   const [paginaCurenta, setPaginaCurenta] = useState('acasa')
