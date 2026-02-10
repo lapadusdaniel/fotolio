@@ -1,39 +1,82 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { auth, db } from '../firebase'
+import { signOut } from 'firebase/auth'
+import { collection, addDoc, deleteDoc, doc, query, where, onSnapshot } from 'firebase/firestore'
 
 function Dashboard({ user, onLogout }) {
-  const [galerii, setGalerii] = useState([
-    { id: 1, nume: 'Nuntă Maria & Ion', categoria: 'Nunți', poze: 156, data: '15 Dec 2025' },
-    { id: 2, nume: 'Botez Sofia', categoria: 'Botezuri', poze: 89, data: '10 Dec 2025' },
-  ])
-
+  const [galerii, setGalerii] = useState([])
   const [showAddGalerie, setShowAddGalerie] = useState(false)
   const [numeGalerie, setNumeGalerie] = useState('')
   const [categorieGalerie, setCategorieGalerie] = useState('Nunți')
+  const [loading, setLoading] = useState(true)
 
-  const handleAddGalerie = (e) => {
+  // Ascultă schimbări în galeriile user-ului
+  useEffect(() => {
+    if (!user?.uid) return
+
+    const q = query(
+      collection(db, 'galerii'),
+      where('userId', '==', user.uid)
+    )
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const galeriiData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setGalerii(galeriiData)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [user?.uid])
+
+  const handleAddGalerie = async (e) => {
     e.preventDefault()
     if (!numeGalerie) {
       alert('Adaugă un nume pentru galerie!')
       return
     }
 
-    const nouaGalerie = {
-      id: Date.now(),
-      nume: numeGalerie,
-      categoria: categorieGalerie,
-      poze: 0,
-      data: new Date().toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' })
-    }
+    try {
+      await addDoc(collection(db, 'galerii'), {
+        nume: numeGalerie,
+        categoria: categorieGalerie,
+        poze: 0,
+        userId: user.uid,
+        data: new Date().toISOString(),
+        createdAt: new Date()
+      })
 
-    setGalerii([nouaGalerie, ...galerii])
-    setNumeGalerie('')
-    setShowAddGalerie(false)
-    alert('Galerie adăugată! 🎉')
+      setNumeGalerie('')
+      setShowAddGalerie(false)
+      alert('Galerie adăugată! 🎉')
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Eroare la adăugare galerie!')
+    }
   }
 
-  const handleDeleteGalerie = (id) => {
+  const handleDeleteGalerie = async (id) => {
     if (window.confirm('Sigur vrei să ștergi această galerie?')) {
-      setGalerii(galerii.filter(g => g.id !== id))
+      try {
+        await deleteDoc(doc(db, 'galerii', id))
+      } catch (error) {
+        console.error('Error:', error)
+        alert('Eroare la ștergere!')
+      }
+    }
+  }
+
+  const handleLogout = async () => {
+    if (window.confirm('Sigur vrei să te deconectezi?')) {
+      try {
+        await signOut(auth)
+        onLogout()
+      } catch (error) {
+        console.error('Error:', error)
+        alert('Eroare la deconectare!')
+      }
     }
   }
 
@@ -53,7 +96,7 @@ function Dashboard({ user, onLogout }) {
           <p style={{ margin: '10px 0 0 0', color: '#999' }}>{user.email}</p>
         </div>
         <button
-          onClick={onLogout}
+          onClick={handleLogout}
           style={{
             backgroundColor: 'transparent',
             border: '2px solid white',
@@ -94,7 +137,7 @@ function Dashboard({ user, onLogout }) {
           }}>
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>Total Poze</div>
             <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#0066cc' }}>
-              {galerii.reduce((sum, g) => sum + g.poze, 0)}
+              {galerii.reduce((sum, g) => sum + (g.poze || 0), 0)}
             </div>
           </div>
 
@@ -104,8 +147,10 @@ function Dashboard({ user, onLogout }) {
             borderRadius: '10px',
             boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
           }}>
-            <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>Stocare folosită</div>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#0066cc' }}>2.4 GB</div>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>Plan curent</div>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#0066cc' }}>
+              {user.plan === 'free' ? 'Free' : user.plan === 'pro' ? 'Pro' : 'Unlimited'}
+            </div>
           </div>
         </div>
 
@@ -181,7 +226,11 @@ function Dashboard({ user, onLogout }) {
           )}
 
           {/* Lista de galerii */}
-          {galerii.length === 0 ? (
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+              <p>Se încarcă galeriile...</p>
+            </div>
+          ) : galerii.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
               <p>Nu ai nicio galerie încă. Adaugă prima ta galerie! 📸</p>
             </div>
@@ -205,8 +254,8 @@ function Dashboard({ user, onLogout }) {
                     <h3 style={{ margin: '0 0 5px 0', fontSize: '18px' }}>{galerie.nume}</h3>
                     <div style={{ display: 'flex', gap: '20px', fontSize: '14px', color: '#666' }}>
                       <span>📁 {galerie.categoria}</span>
-                      <span>📸 {galerie.poze} poze</span>
-                      <span>📅 {galerie.data}</span>
+                      <span>📸 {galerie.poze || 0} poze</span>
+                      <span>📅 {new Date(galerie.data).toLocaleDateString('ro-RO')}</span>
                     </div>
                   </div>
 

@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { auth, db } from '../firebase'
+import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { doc, setDoc } from 'firebase/firestore'
 
 function Register({ onRegister, onSwitchToLogin }) {
   const [formData, setFormData] = useState({
@@ -7,38 +10,72 @@ function Register({ onRegister, onSwitchToLogin }) {
     password: '',
     confirmPassword: ''
   })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     })
+    setError('')
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
 
-    // Validări
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-      alert('Completează toate câmpurile!')
+      setError('Completează toate câmpurile!')
       return
     }
 
     if (formData.password.length < 6) {
-      alert('Parola trebuie să aibă minim 6 caractere!')
+      setError('Parola trebuie să aibă minim 6 caractere!')
       return
     }
 
     if (formData.password !== formData.confirmPassword) {
-      alert('Parolele nu coincid!')
+      setError('Parolele nu coincid!')
       return
     }
 
-    // Simulăm înregistrare
-    onRegister({
-      name: formData.name,
-      email: formData.email
-    })
+    setLoading(true)
+
+    try {
+      // Creează user în Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      )
+
+      // Salvează info suplimentară în Firestore
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        name: formData.name,
+        email: formData.email,
+        createdAt: new Date().toISOString(),
+        plan: 'free'
+      })
+
+      onRegister({
+        uid: userCredential.user.uid,
+        name: formData.name,
+        email: formData.email
+      })
+
+    } catch (error) {
+      console.error('Error:', error)
+      if (error.code === 'auth/email-already-in-use') {
+        setError('Email-ul este deja folosit!')
+      } else if (error.code === 'auth/invalid-email') {
+        setError('Email invalid!')
+      } else {
+        setError('Eroare la înregistrare. Încearcă din nou.')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -63,6 +100,20 @@ function Register({ onRegister, onSwitchToLogin }) {
           Începe perioada gratuită de 14 zile
         </p>
 
+        {error && (
+          <div style={{
+            backgroundColor: '#fee',
+            color: '#c33',
+            padding: '12px',
+            borderRadius: '5px',
+            marginBottom: '20px',
+            fontSize: '14px',
+            textAlign: 'center'
+          }}>
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
@@ -74,6 +125,7 @@ function Register({ onRegister, onSwitchToLogin }) {
               value={formData.name}
               onChange={handleChange}
               placeholder="Ion Popescu"
+              disabled={loading}
               style={{ marginBottom: 0 }}
             />
           </div>
@@ -88,6 +140,7 @@ function Register({ onRegister, onSwitchToLogin }) {
               value={formData.email}
               onChange={handleChange}
               placeholder="nume@exemplu.ro"
+              disabled={loading}
               style={{ marginBottom: 0 }}
             />
           </div>
@@ -102,6 +155,7 @@ function Register({ onRegister, onSwitchToLogin }) {
               value={formData.password}
               onChange={handleChange}
               placeholder="Minimum 6 caractere"
+              disabled={loading}
               style={{ marginBottom: 0 }}
             />
           </div>
@@ -116,12 +170,18 @@ function Register({ onRegister, onSwitchToLogin }) {
               value={formData.confirmPassword}
               onChange={handleChange}
               placeholder="Rescrie parola"
+              disabled={loading}
               style={{ marginBottom: 0 }}
             />
           </div>
 
-          <button type="submit" className="btn-primary" style={{ width: '100%' }}>
-            Creează cont gratuit
+          <button 
+            type="submit" 
+            className="btn-primary" 
+            style={{ width: '100%' }}
+            disabled={loading}
+          >
+            {loading ? 'Se creează contul...' : 'Creează cont gratuit'}
           </button>
         </form>
 
@@ -130,7 +190,12 @@ function Register({ onRegister, onSwitchToLogin }) {
             Ai deja cont?{' '}
             <span
               onClick={onSwitchToLogin}
-              style={{ color: '#0066cc', cursor: 'pointer', fontWeight: 'bold' }}
+              style={{ 
+                color: '#0066cc', 
+                cursor: loading ? 'not-allowed' : 'pointer', 
+                fontWeight: 'bold',
+                opacity: loading ? 0.5 : 1
+              }}
             >
               Autentifică-te
             </span>

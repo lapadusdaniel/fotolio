@@ -1,13 +1,35 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 import Login from './components/login.jsx'
 import Register from './components/Register.jsx'
 import Dashboard from './components/Dashboard.jsx'
+import { auth } from './firebase'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 
 function App() {
   const [paginaCurenta, setPaginaCurenta] = useState('acasa')
   const [authView, setAuthView] = useState(null) // null, 'login', 'register'
   const [user, setUser] = useState(null) // null = nu e logat, object = logat
+  const [loadingAuth, setLoadingAuth] = useState(true)
+
+  // Ascultă permanent starea de autentificare din Firebase
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const displayName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Utilizator')
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: displayName
+        })
+      } else {
+        setUser(null)
+      }
+      setLoadingAuth(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
 
   // Handler pentru login
   const handleLogin = (userData) => {
@@ -25,13 +47,19 @@ function App() {
     alert(`Cont creat cu succes! Bun venit, ${userData.name}! 🎉`)
   }
 
-  // Handler pentru logout
-  const handleLogout = () => {
-    if (window.confirm('Sigur vrei să te deconectezi?')) {
-      setUser(null)
-      setPaginaCurenta('acasa')
-      alert('Te-ai deconectat cu succes!')
+  // Handler pentru logout (și din Firebase Auth)
+  const handleLogout = async () => {
+    if (!window.confirm('Sigur vrei să te deconectezi?')) return
+
+    try {
+      await signOut(auth)
+    } catch (error) {
+      console.error('Eroare la deconectare:', error)
     }
+
+    setUser(null)
+    setPaginaCurenta('acasa')
+    alert('Te-ai deconectat cu succes!')
   }
 
   // Afișează Login/Register dacă sunt active
