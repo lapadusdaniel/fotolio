@@ -22,12 +22,15 @@ function App() {
           email: firebaseUser.email,
           name: displayName
         })
+        // Dacă e logat și nu e pe o pagină publică, du-l la dashboard
+        if (paginaCurenta !== 'acasa' && paginaCurenta !== 'portofoliu' && paginaCurenta !== 'preturi' && paginaCurenta !== 'contact') {
+          setPaginaCurenta('dashboard')
+        }
       } else {
         setUser(null)
       }
       setLoadingAuth(false)
     })
-
     return () => unsubscribe()
   }, [])
 
