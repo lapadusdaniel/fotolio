@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { auth, db } from '../firebase'
 import { signOut } from 'firebase/auth'
 import { collection, addDoc, deleteDoc, doc, query, where, onSnapshot } from 'firebase/firestore'
+import GalerieView from './GalerieView'
 
 function Dashboard({ user, onLogout }) {
   const [galerii, setGalerii] = useState([])
@@ -9,6 +10,7 @@ function Dashboard({ user, onLogout }) {
   const [numeGalerie, setNumeGalerie] = useState('')
   const [categorieGalerie, setCategorieGalerie] = useState('Nunți')
   const [loading, setLoading] = useState(true)
+  const [galerieSelectata, setGalerieSelectata] = useState(null)
 
   // Ascultă schimbări în galeriile user-ului
   useEffect(() => {
@@ -78,6 +80,51 @@ function Dashboard({ user, onLogout }) {
         alert('Eroare la deconectare!')
       }
     }
+  }
+
+  if (galerieSelectata) {
+    return (
+      <div className="page-content">
+        <div style={{
+          backgroundColor: '#1a1a1a',
+          color: 'white',
+          padding: '30px 50px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <h1 style={{ margin: 0, fontSize: '28px' }}>{galerieSelectata.nume}</h1>
+          <button
+            onClick={handleLogout}
+            style={{
+              backgroundColor: 'transparent',
+              border: '2px solid white',
+              color: 'white',
+              padding: '10px 20px',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Deconectare
+          </button>
+        </div>
+        <div style={{ padding: '40px 50px', backgroundColor: '#f5f5f5', minHeight: '70vh' }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '30px',
+            borderRadius: '10px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+          }}>
+            <GalerieView
+              galerie={galerieSelectata}
+              user={user}
+              onBack={() => setGalerieSelectata(null)}
+            />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -261,7 +308,7 @@ function Dashboard({ user, onLogout }) {
 
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button
-                      onClick={() => alert('Funcție de editare - Coming soon!')}
+                      onClick={() => setGalerieSelectata(galerie)}
                       style={{
                         padding: '8px 16px',
                         backgroundColor: '#0066cc',
