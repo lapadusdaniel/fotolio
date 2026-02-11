@@ -1,61 +1,44 @@
-const WORKER_URL = 'https://delicate-forest-6b3f.lapadusdaniel.workers.dev'
+const WORKER_URL = import.meta.env.VITE_CLOUDFLARE_WORKER_URL
 
-/**
- * Upload a photo to R2 via the Cloudflare Worker.
- * Key format: {userId}/{galerieId}/{timestamp}-{fileName}
- */
-export async function uploadPhoto(file, userId, galerieId) {
+export const uploadPoza = async (file, userId, galerieId) => {
   const key = `${userId}/${galerieId}/${Date.now()}-${file.name}`
 
-  const res = await fetch(`${WORKER_URL}/${key}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': file.type },
-    body: file
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('key', key)
+
+  const response = await fetch(`${WORKER_URL}/upload`, {
+    method: 'POST',
+    body: formData
   })
 
-  if (!res.ok) {
-    throw new Error(`Upload failed: ${res.status} ${res.statusText}`)
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Upload failed: ${error}`)
   }
 
-  return { key, url: `${WORKER_URL}/${key}` }
+  return await response.json()
 }
 
-/**
- * List all photos in a gallery.
- * Returns an array of { key, url } objects.
- */
-export async function listPhotos(userId, galerieId) {
+export const listPoze = async (userId, galerieId) => {
   const prefix = `${userId}/${galerieId}/`
-  const res = await fetch(`${WORKER_URL}?prefix=${encodeURIComponent(prefix)}`)
+  const response = await fetch(`${WORKER_URL}/list?prefix=${encodeURIComponent(prefix)}`)
 
-  if (!res.ok) {
-    throw new Error(`List failed: ${res.status} ${res.statusText}`)
-  }
+  if (!response.ok) throw new Error('List failed')
 
-  const data = await res.json()
-
-  return (data.objects || []).map((obj) => ({
-    key: obj.key,
-    url: `${WORKER_URL}/${obj.key}`
-  }))
+  const data = await response.json()
+  return data.objects || []
 }
 
-/**
- * Get the public URL for a photo key.
- */
-export function getPhotoUrl(key) {
-  return `${WORKER_URL}/${key}`
+export const getPozaUrl = (key) => {
+  return `${WORKER_URL}/download/${encodeURIComponent(key)}`
 }
 
-/**
- * Delete a photo from R2.
- */
-export async function deletePhoto(key) {
-  const res = await fetch(`${WORKER_URL}/${key}`, {
+export const deletePoza = async (key) => {
+  const response = await fetch(`${WORKER_URL}/delete/${encodeURIComponent(key)}`, {
     method: 'DELETE'
   })
 
-  if (!res.ok) {
-    throw new Error(`Delete failed: ${res.status} ${res.statusText}`)
-  }
+  if (!response.ok) throw new Error('Delete failed')
+  return await response.json()
 }
