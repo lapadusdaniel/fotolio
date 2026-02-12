@@ -7,7 +7,11 @@ import { auth } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 
 function App() {
-  const [paginaCurenta, setPaginaCurenta] = useState('acasa')
+  const [paginaCurenta, setPaginaCurenta] = useState(() => {
+    if (typeof window === 'undefined') return 'acasa'
+    const saved = window.localStorage.getItem('paginaCurenta')
+    return saved || 'acasa'
+  })
   const [authView, setAuthView] = useState(null) // null, 'login', 'register'
   const [user, setUser] = useState(null) // null = nu e logat, object = logat
   const [loadingAuth, setLoadingAuth] = useState(true)
@@ -22,10 +26,6 @@ function App() {
           email: firebaseUser.email,
           name: displayName
         })
-        // Dacă e logat și nu e pe o pagină publică, du-l la dashboard
-        if (paginaCurenta !== 'acasa' && paginaCurenta !== 'portofoliu' && paginaCurenta !== 'preturi' && paginaCurenta !== 'contact') {
-          setPaginaCurenta('dashboard')
-        }
       } else {
         setUser(null)
       }
@@ -33,6 +33,13 @@ function App() {
     })
     return () => unsubscribe()
   }, [])
+
+  // Păstrează ultima pagină vizitată (inclusiv Dashboard) între refresh-uri
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('paginaCurenta', paginaCurenta)
+    }
+  }, [paginaCurenta])
 
   // Handler pentru login
   const handleLogin = (userData) => {

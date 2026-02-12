@@ -258,6 +258,22 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Masonry layout pentru grid-ul de poze din Dashboard */
+.masonry-grid {
+  display: flex;
+  margin-left: -15px; /* spațiul dintre coloane */
+  width: auto;
+}
+
+.masonry-grid_column {
+  padding-left: 15px;
+  background-clip: padding-box;
+}
+
+.masonry-grid_column > div {
+  margin-bottom: 15px;
+}
+
 /* Scroll to top button */
 .scroll-to-top {
   position: fixed;

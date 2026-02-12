@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import Masonry from 'react-masonry-css'
 import { auth, db } from '../firebase'
 import { signOut } from 'firebase/auth'
-import { collection, addDoc, deleteDoc, doc, query, where, onSnapshot } from 'firebase/firestore'
+import { collection, addDoc, deleteDoc, doc, query, where, onSnapshot, updateDoc } from 'firebase/firestore'
+import { uploadPoza, listPoze, getPozaUrl, deletePoza } from '../r2'
 
 function Dashboard({ user, onLogout }) {
   const [galerii, setGalerii] = useState([])
@@ -9,8 +11,19 @@ function Dashboard({ user, onLogout }) {
   const [numeGalerie, setNumeGalerie] = useState('')
   const [categorieGalerie, setCategorieGalerie] = useState('Nunți')
   const [loading, setLoading] = useState(true)
+  const [galerieActiva, setGalerieActiva] = useState(null)
+  const [pozeGalerie, setPozeGalerie] = useState([])
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploading, setUploading] = useState(false)
+  const [loadingPoze, setLoadingPoze] = useState(false)
+  const fileInputRef = useRef(null)
+  const masonryBreakpoints = {
+    default: 4,
+    1200: 3,
+    800: 2,
+    500: 1
+  }
 
-  // Ascultă schimbări în galeriile user-ului
   useEffect(() => {
     if (!user?.uid) return
 
@@ -50,7 +63,6 @@ function Dashboard({ user, onLogout }) {
 
       setNumeGalerie('')
       setShowAddGalerie(false)
-      alert('Galerie adăugată! 🎉')
     } catch (error) {
       console.error('Error:', error)
       alert('Eroare la adăugare galerie!')
@@ -61,10 +73,98 @@ function Dashboard({ user, onLogout }) {
     if (window.confirm('Sigur vrei să ștergi această galerie?')) {
       try {
         await deleteDoc(doc(db, 'galerii', id))
+        if (galerieActiva?.id === id) {
+          setGalerieActiva(null)
+          setPozeGalerie([])
+        }
       } catch (error) {
         console.error('Error:', error)
         alert('Eroare la ștergere!')
       }
+    }
+  }
+
+  const handleDeschideGalerie = async (galerie) => {
+    setGalerieActiva(galerie)
+    setLoadingPoze(true)
+    setPozeGalerie([])
+
+    try {
+      const poze = await listPoze(galerie.id, user.uid)
+
+      const pozeWithUrlsRaw = await Promise.all(
+        poze.map(async (poza) => {
+          const key = poza.key || poza.name || poza.Key
+
+          if (!key) {
+            console.error('Poză fără key primit de la Worker/R2:', poza)
+            return null
+          }
+
+          const url = await getPozaUrl(key)
+          return {
+            key,
+            url,
+            size: poza.size ?? poza.Size,
+            lastModified: poza.lastModified ?? poza.uploaded ?? poza.LastModified
+          }
+        })
+      )
+
+      const pozeWithUrls = pozeWithUrlsRaw.filter(Boolean)
+      setPozeGalerie(pozeWithUrls)
+    } catch (error) {
+      console.error('Error loading poze:', error)
+      alert('Eroare la încărcarea pozelor!')
+    } finally {
+      setLoadingPoze(false)
+    }
+  }
+
+  const handleUploadPoze = async (e) => {
+    const files = Array.from(e.target.files)
+    if (!files.length || !galerieActiva) return
+
+    setUploading(true)
+    setUploadProgress(0)
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        await uploadPoza(file, galerieActiva.id, user.uid, (filePercent) => {
+          const overall = Math.round(((i + filePercent / 100) / files.length) * 100)
+          setUploadProgress(overall)
+        })
+      }
+
+      // Refresh poze
+      await handleDeschideGalerie(galerieActiva)
+
+      // Update count în Firestore
+      const galerieRef = doc(db, 'galerii', galerieActiva.id)
+      await updateDoc(galerieRef, {
+        poze: pozeGalerie.length + files.length
+      })
+
+    } catch (error) {
+      console.error('Error uploading:', error)
+      alert('Eroare la upload!')
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleDeletePoza = async (pozaKey) => {
+    if (!window.confirm('Ștergi această poză?')) return
+
+    try {
+      await deletePoza(pozaKey)
+      setPozeGalerie(prev => prev.filter(p => p.key !== pozaKey))
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Eroare la ștergere!')
     }
   }
 
@@ -75,14 +175,167 @@ function Dashboard({ user, onLogout }) {
         onLogout()
       } catch (error) {
         console.error('Error:', error)
-        alert('Eroare la deconectare!')
       }
     }
   }
 
+  // VIEW: Galerie deschisă cu poze
+  if (galerieActiva) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+        {/* Header galerie */}
+        <div style={{
+          backgroundColor: '#1a1a1a',
+          color: 'white',
+          padding: '20px 40px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <button
+              onClick={() => { setGalerieActiva(null); setPozeGalerie([]) }}
+              style={{
+                backgroundColor: 'transparent',
+                border: '1px solid white',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              ← Înapoi
+            </button>
+            <div>
+              <h2 style={{ margin: 0 }}>{galerieActiva.nume}</h2>
+              <p style={{ margin: 0, color: '#999', fontSize: '14px' }}>
+                {galerieActiva.categoria} • {pozeGalerie.length} poze
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {uploading && (
+              <div style={{ color: '#999', fontSize: '14px' }}>
+                Se uploadează... {uploadProgress}%
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleUploadPoze}
+              style={{ display: 'none' }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="btn-primary"
+              style={{ padding: '10px 20px', fontSize: '14px' }}
+            >
+              {uploading ? `${uploadProgress}%` : '+ Adaugă poze'}
+            </button>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        {uploading && (
+          <div style={{ backgroundColor: '#e0e0e0', height: '4px' }}>
+            <div style={{
+              backgroundColor: '#0066cc',
+              height: '100%',
+              width: `${uploadProgress}%`,
+              transition: 'width 0.3s ease'
+            }} />
+          </div>
+        )}
+
+        {/* Grid poze */}
+        <div style={{ padding: '30px 40px' }}>
+          {loadingPoze ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#999' }}>
+              <p>Se încarcă pozele...</p>
+            </div>
+          ) : pozeGalerie.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '60px',
+              color: '#999',
+              backgroundColor: 'white',
+              borderRadius: '10px',
+              border: '2px dashed #ddd'
+            }}>
+              <p style={{ fontSize: '48px', margin: '0 0 20px 0' }}>📸</p>
+              <p style={{ fontSize: '18px', marginBottom: '10px' }}>Nicio poză încă</p>
+              <p style={{ fontSize: '14px', marginBottom: '20px' }}>Click pe "Adaugă poze" pentru a încărca</p>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="btn-primary"
+              >
+                + Adaugă prima poză
+              </button>
+            </div>
+          ) : (
+            <Masonry
+              breakpointCols={masonryBreakpoints}
+              className="masonry-grid"
+              columnClassName="masonry-grid_column"
+            >
+              {pozeGalerie.map((poza) => (
+                <div
+                  key={poza.key}
+                  style={{
+                    position: 'relative',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    backgroundColor: '#e0e0e0'
+                  }}
+                  className="feature-card"
+                >
+                  <img
+                    src={poza.url}
+                    alt="Poză galerie"
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                      display: 'block'
+                    }}
+                  />
+                  <button
+                    onClick={() => handleDeletePoza(poza.key)}
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      backgroundColor: 'rgba(220,53,69,0.9)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '30px',
+                      height: '30px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </Masonry>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // VIEW: Dashboard principal
   return (
     <div className="page-content">
-      {/* Dashboard Header */}
       <div style={{
         backgroundColor: '#1a1a1a',
         color: 'white',
@@ -111,9 +364,8 @@ function Dashboard({ user, onLogout }) {
         </button>
       </div>
 
-      {/* Stats Cards */}
       <div style={{ padding: '40px 50px', backgroundColor: '#f5f5f5' }}>
-        <div className="grid-3" style={{
+        <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
           gap: '20px',
@@ -148,13 +400,10 @@ function Dashboard({ user, onLogout }) {
             boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
           }}>
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>Plan curent</div>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#0066cc' }}>
-              {user.plan === 'free' ? 'Free' : user.plan === 'pro' ? 'Pro' : 'Unlimited'}
-            </div>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#0066cc' }}>Free</div>
           </div>
         </div>
 
-        {/* Galerii Section */}
         <div style={{
           backgroundColor: 'white',
           padding: '30px',
@@ -172,7 +421,6 @@ function Dashboard({ user, onLogout }) {
             </button>
           </div>
 
-          {/* Form adaugare galerie */}
           {showAddGalerie && (
             <form onSubmit={handleAddGalerie} style={{
               backgroundColor: '#f8f9fa',
@@ -193,7 +441,6 @@ function Dashboard({ user, onLogout }) {
                     style={{ marginBottom: 0 }}
                   />
                 </div>
-
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
                     Categorie
@@ -217,7 +464,6 @@ function Dashboard({ user, onLogout }) {
                     <option>Altele</option>
                   </select>
                 </div>
-
                 <button type="submit" className="btn-primary" style={{ padding: '15px 30px', fontSize: '14px' }}>
                   Salvează
                 </button>
@@ -225,7 +471,6 @@ function Dashboard({ user, onLogout }) {
             </form>
           )}
 
-          {/* Lista de galerii */}
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
               <p>Se încarcă galeriile...</p>
@@ -246,9 +491,7 @@ function Dashboard({ user, onLogout }) {
                     padding: '20px',
                     border: '1px solid #e0e0e0',
                     borderRadius: '8px',
-                    transition: 'all 0.3s ease'
                   }}
-                  className="feature-card"
                 >
                   <div>
                     <h3 style={{ margin: '0 0 5px 0', fontSize: '18px' }}>{galerie.nume}</h3>
@@ -258,10 +501,9 @@ function Dashboard({ user, onLogout }) {
                       <span>📅 {new Date(galerie.data).toLocaleDateString('ro-RO')}</span>
                     </div>
                   </div>
-
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button
-                      onClick={() => alert('Funcție de editare - Coming soon!')}
+                      onClick={() => handleDeschideGalerie(galerie)}
                       style={{
                         padding: '8px 16px',
                         backgroundColor: '#0066cc',
@@ -272,7 +514,7 @@ function Dashboard({ user, onLogout }) {
                         fontSize: '14px'
                       }}
                     >
-                      Vizualizează
+                      Deschide
                     </button>
                     <button
                       onClick={() => handleDeleteGalerie(galerie.id)}
