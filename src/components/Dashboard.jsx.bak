@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import slugify from 'slugify'
 import Masonry from 'react-masonry-css'
-import { db } from '../firebase'
-import { collection, addDoc, doc, query, where, onSnapshot, updateDoc, getDoc, setDoc } from 'firebase/firestore'
+import { auth, db } from '../firebase'
+import { collection, addDoc, deleteDoc, doc, query, where, onSnapshot, updateDoc } from 'firebase/firestore'
 import { uploadPoza, listPoze, getPozaUrl, deletePoza } from '../r2'
 import Lightbox from './Lightbox'
 import './Dashboard.css'
@@ -22,15 +22,6 @@ function Dashboard({ user, onLogout }) {
   const fileInputRef = useRef(null)
   const [indexPozaSelectata, setIndexPozaSelectata] = useState(null)
   const [activeMenu, setActiveMenu] = useState('drive')
-  const [setariForm, setSetariForm] = useState({
-    numeBrand: '',
-    website: '',
-    instagram: ''
-  })
-  const [loadingSetari, setLoadingSetari] = useState(false)
-  const [savingSetari, setSavingSetari] = useState(false)
-  const [statusSetari, setStatusSetari] = useState('')
-  const [headerBrandName, setHeaderBrandName] = useState('')
 
   const masonryBreakpoints = { default: 4, 1200: 3, 800: 2, 500: 1 }
 
@@ -45,35 +36,6 @@ function Dashboard({ user, onLogout }) {
     return () => unsubscribe()
   }, [user?.uid])
 
-  useEffect(() => {
-    if (!user?.uid) return
-
-    let mounted = true
-
-    const fetchHeaderBrand = async () => {
-      try {
-        const setariRef = doc(db, 'setariFotografi', user.uid)
-        const setariSnap = await getDoc(setariRef)
-        if (!mounted) return
-
-        if (setariSnap.exists()) {
-          const data = setariSnap.data()
-          setHeaderBrandName((data.numeBrand || '').trim())
-        } else {
-          setHeaderBrandName('')
-        }
-      } catch (error) {
-        console.error('Eroare la încărcarea brandului pentru header:', error)
-      }
-    }
-
-    fetchHeaderBrand()
-
-    return () => {
-      mounted = false
-    }
-  }, [user?.uid])
-
   // 2. Efect pentru persistență la refresh (Aici e Pasul A)
   useEffect(() => {
     const savedGalId = localStorage.getItem('last_gal_id');
@@ -83,72 +45,16 @@ function Dashboard({ user, onLogout }) {
     }
   }, [galerii]);
 
-  // 3. Efect pentru încărcarea setărilor fotografului
-  useEffect(() => {
-    if (activeMenu !== 'settings' || !user?.uid) return
-
-    let mounted = true
-
-    const fetchSetari = async () => {
-      setLoadingSetari(true)
-      setStatusSetari('')
-
-      try {
-        const setariRef = doc(db, 'setariFotografi', user.uid)
-        const setariSnap = await getDoc(setariRef)
-
-        if (!mounted) return
-
-        if (setariSnap.exists()) {
-          const data = setariSnap.data()
-          const brandSalvat = data.numeBrand || ''
-          setSetariForm({
-            numeBrand: brandSalvat || data.numeFotograf || user.name || '',
-            website: data.website || data.linkWebsite || '',
-            instagram: data.instagram || data.linkInstagram || ''
-          })
-          setHeaderBrandName(brandSalvat.trim())
-        } else {
-          setSetariForm({
-            numeBrand: user.name || '',
-            website: '',
-            instagram: ''
-          })
-          setHeaderBrandName('')
-        }
-      } catch (error) {
-        console.error('Eroare la încărcarea setărilor:', error)
-        if (mounted) setStatusSetari('Nu am putut încărca setările.')
-      } finally {
-        if (mounted) setLoadingSetari(false)
-      }
-    }
-
-    fetchSetari()
-
-    return () => {
-      mounted = false
-    }
-  }, [activeMenu, user?.uid, user?.name])
-
   const handleAddGalerie = async (e) => {
     e.preventDefault()
     if (!numeGalerie) return
     try {
-      const setariRef = doc(db, 'setariFotografi', user.uid)
-      const setariSnap = await getDoc(setariRef)
-      const numeBrandSetat = setariSnap.exists() ? (setariSnap.data().numeBrand || '').trim() : ''
-
-      const numeBrandFinal = numeBrandSetat || user.name || user.displayName || 'fotograf'
-      const brandSlug = slugify(numeBrandFinal, { lower: true, strict: true })
-      const galerieSlug = slugify(numeGalerie, { lower: true, strict: true })
-      const slug = `${brandSlug}-${galerieSlug}-${Date.now()}`
-
+      const slug = `${slugify(numeGalerie, { lower: true })}-${Date.now()}`
       await addDoc(collection(db, 'galerii'), {
         nume: numeGalerie,
         slug: slug,
         userId: user.uid,
-        userName: numeBrandFinal,
+        userName: user.displayName || 'Daniel Lapadus',
         dataEveniment: dataEveniment || new Date().toISOString().split('T')[0],
         dataExpirare: dataExpirare || '',
         statusActiv: true,
@@ -224,42 +130,6 @@ function Dashboard({ user, onLogout }) {
       } catch (e) {
         console.error(e)
       }
-    }
-  }
-
-  const handleSetariChange = (event) => {
-    const { name, value } = event.target
-    setSetariForm((prev) => ({ ...prev, [name]: value }))
-    if (statusSetari) setStatusSetari('')
-  }
-
-  const handleSaveSetari = async (event) => {
-    event.preventDefault()
-    if (!user?.uid) return
-
-    setSavingSetari(true)
-    setStatusSetari('')
-
-    try {
-      await setDoc(
-        doc(db, 'setariFotografi', user.uid),
-        {
-          userId: user.uid,
-          numeBrand: setariForm.numeBrand.trim(),
-          website: setariForm.website.trim(),
-          instagram: setariForm.instagram.trim(),
-          updatedAt: new Date().toISOString()
-        },
-        { merge: true }
-      )
-
-      setStatusSetari('Salvat!')
-      setHeaderBrandName(setariForm.numeBrand.trim())
-    } catch (error) {
-      console.error('Eroare la salvarea setărilor:', error)
-      setStatusSetari('Eroare la salvare. Încearcă din nou.')
-    } finally {
-      setSavingSetari(false)
     }
   }
 
@@ -364,6 +234,27 @@ function Dashboard({ user, onLogout }) {
         </button>
         
         <button 
+          className={`sidebar-button ${activeMenu === 'previews' ? 'active' : ''}`}
+          onClick={() => setActiveMenu('previews')}
+        >
+          👁️ Previews
+        </button>
+        
+        <button 
+          className={`sidebar-button ${activeMenu === 'reviews' ? 'active' : ''}`}
+          onClick={() => setActiveMenu('reviews')}
+        >
+          ⭐ Reviews
+        </button>
+        
+        <button 
+          className={`sidebar-button ${activeMenu === 'analytics' ? 'active' : ''}`}
+          onClick={() => setActiveMenu('analytics')}
+        >
+          📊 Analytics
+        </button>
+        
+        <button 
           className={`sidebar-button ${activeMenu === 'settings' ? 'active' : ''}`}
           onClick={() => setActiveMenu('settings')}
         >
@@ -380,9 +271,12 @@ function Dashboard({ user, onLogout }) {
         <header className="dashboard-header">
           <h1>
             {activeMenu === 'drive' && '💾 DRIVE'}
+            {activeMenu === 'previews' && '👁️ PREVIEWS'}
+            {activeMenu === 'reviews' && '⭐ REVIEWS'}
+            {activeMenu === 'analytics' && '📊 ANALYTICS'}
             {activeMenu === 'settings' && '⚙️ SETTINGS'}
           </h1>
-          <span className="user-info">{headerBrandName || user.name || user.email}</span>
+          <span className="user-info">{user.name || user.email}</span>
         </header>
 
         {/* VIEW DRIVE */}
@@ -456,68 +350,36 @@ function Dashboard({ user, onLogout }) {
           </div>
         )}
 
+        {/* PLACEHOLDER VIEWS */}
+        {activeMenu === 'previews' && (
+          <div className="placeholder-view">
+            <h2>👁️</h2>
+            <h3>Previews</h3>
+            <p>Feature în dezvoltare...</p>
+          </div>
+        )}
+
+        {activeMenu === 'reviews' && (
+          <div className="placeholder-view">
+            <h2>⭐</h2>
+            <h3>Reviews</h3>
+            <p>Feature în dezvoltare...</p>
+          </div>
+        )}
+
+        {activeMenu === 'analytics' && (
+          <div className="placeholder-view">
+            <h2>📊</h2>
+            <h3>Analytics</h3>
+            <p>Feature în dezvoltare...</p>
+          </div>
+        )}
+
         {activeMenu === 'settings' && (
-          <div className="settings-content">
-            <div className="settings-panel">
-              <div className="settings-panel-header">
-                <h2>Setări Profil Fotograf</h2>
-                <p>Personalizează informațiile afișate pentru brandul tău.</p>
-              </div>
-
-              {loadingSetari ? (
-                <div className="settings-loading">Se încarcă setările...</div>
-              ) : (
-                <form className="settings-form" onSubmit={handleSaveSetari}>
-                  <div className="settings-field">
-                    <label htmlFor="numeBrand">Nume Brand / Nume Fotograf</label>
-                    <input
-                      id="numeBrand"
-                      type="text"
-                      name="numeBrand"
-                      value={setariForm.numeBrand}
-                      onChange={handleSetariChange}
-                      placeholder="Ex: Daniel Lapadus Photography"
-                    />
-                  </div>
-
-                  <div className="settings-field">
-                    <label htmlFor="website">Link Website / Portofoliu</label>
-                    <input
-                      id="website"
-                      type="text"
-                      name="website"
-                      value={setariForm.website}
-                      onChange={handleSetariChange}
-                      placeholder="https://siteul-tau.ro"
-                    />
-                  </div>
-
-                  <div className="settings-field">
-                    <label htmlFor="instagram">Link Instagram</label>
-                    <input
-                      id="instagram"
-                      type="text"
-                      name="instagram"
-                      value={setariForm.instagram}
-                      onChange={handleSetariChange}
-                      placeholder="https://instagram.com/contul_tau"
-                    />
-                  </div>
-
-                  <div className="settings-actions">
-                    <button type="submit" className="btn-save-settings" disabled={savingSetari}>
-                      {savingSetari ? 'Se salvează...' : 'Salvează Setările'}
-                    </button>
-
-                    {statusSetari && (
-                      <span className={`settings-feedback ${statusSetari === 'Salvat!' ? 'success' : 'error'}`}>
-                        {statusSetari}
-                      </span>
-                    )}
-                  </div>
-                </form>
-              )}
-            </div>
+          <div className="placeholder-view">
+            <h2>⚙️</h2>
+            <h3>Settings</h3>
+            <p>Feature în dezvoltare...</p>
           </div>
         )}
       </div>

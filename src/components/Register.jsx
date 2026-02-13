@@ -1,10 +1,13 @@
 import { useState } from 'react'
-import { auth, db } from '../firebase'
+import { Link } from 'react-router-dom'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
+import { auth, db } from '../firebase'
+import './AuthPage.css'
 
-function Register({ onRegister, onSwitchToLogin }) {
+function Register({ onRegister }) {
   const [formData, setFormData] = useState({
+    numeBrand: '',
     name: '',
     email: '',
     password: '',
@@ -13,19 +16,19 @@ function Register({ onRegister, onSwitchToLogin }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
+  const handleChange = (event) => {
+    setFormData((prev) => ({
+      ...prev,
+      [event.target.name]: event.target.value
+    }))
     setError('')
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (event) => {
+    event.preventDefault()
     setError('')
 
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+    if (!formData.numeBrand || !formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
       setError('Completează toate câmpurile!')
       return
     }
@@ -43,32 +46,32 @@ function Register({ onRegister, onSwitchToLogin }) {
     setLoading(true)
 
     try {
-      // Creează user în Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      )
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
+      const dataCreare = new Date().toISOString()
 
-      // Salvează info suplimentară în Firestore
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         name: formData.name,
         email: formData.email,
-        createdAt: new Date().toISOString(),
+        numeBrand: formData.numeBrand.trim(),
+        createdAt: dataCreare,
         plan: 'free'
       })
 
+      await setDoc(doc(db, 'setariFotografi', userCredential.user.uid), {
+        userId: userCredential.user.uid,
+        numeBrand: formData.numeBrand.trim(),
+        dataCreare
+      }, { merge: true })
+
       onRegister({
         uid: userCredential.user.uid,
-        name: formData.name,
+        name: formData.numeBrand.trim(),
         email: formData.email
       })
-
-    } catch (error) {
-      console.error('Error:', error)
-      if (error.code === 'auth/email-already-in-use') {
+    } catch (registerError) {
+      if (registerError.code === 'auth/email-already-in-use') {
         setError('Email-ul este deja folosit!')
-      } else if (error.code === 'auth/invalid-email') {
+      } else if (registerError.code === 'auth/invalid-email') {
         setError('Email invalid!')
       } else {
         setError('Eroare la înregistrare. Încearcă din nou.')
@@ -79,130 +82,86 @@ function Register({ onRegister, onSwitchToLogin }) {
   }
 
   return (
-    <div style={{
-      minHeight: '80vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#f5f5f5',
-      padding: '40px 20px'
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        padding: '40px',
-        borderRadius: '10px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-        maxWidth: '400px',
-        width: '100%'
-      }}>
-        <h2 style={{ marginBottom: '10px', textAlign: 'center' }}>Creează cont</h2>
-        <p style={{ textAlign: 'center', color: '#666', marginBottom: '30px' }}>
-          Începe perioada gratuită de 14 zile
-        </p>
+    <section className="auth-page register-minimal-page">
+      <div className="register-minimal-card">
+        <div className="register-minimal-heading">
+          <p>Începe perioada gratuită</p>
+          <h2>Creează cont Fotolio</h2>
+        </div>
 
-        {error && (
-          <div style={{
-            backgroundColor: '#fee',
-            color: '#c33',
-            padding: '12px',
-            borderRadius: '5px',
-            marginBottom: '20px',
-            fontSize: '14px',
-            textAlign: 'center'
-          }}>
-            {error}
-          </div>
-        )}
+        {error && <div className="auth-error">{error}</div>}
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-              Nume complet
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="Ion Popescu"
-              disabled={loading}
-              style={{ marginBottom: 0 }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-              Email
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="nume@exemplu.ro"
-              disabled={loading}
-              style={{ marginBottom: 0 }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-              Parolă
-            </label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Minimum 6 caractere"
-              disabled={loading}
-              style={{ marginBottom: 0 }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '25px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-              Confirmă parola
-            </label>
-            <input
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              placeholder="Rescrie parola"
-              disabled={loading}
-              style={{ marginBottom: 0 }}
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn-primary" 
-            style={{ width: '100%' }}
+        <form className="register-minimal-form" onSubmit={handleSubmit}>
+          <label htmlFor="register-brand">Nume Brand / Studio</label>
+          <input
+            id="register-brand"
+            type="text"
+            name="numeBrand"
+            value={formData.numeBrand}
+            onChange={handleChange}
+            placeholder="Ex: Andrei Studio"
             disabled={loading}
-          >
-            {loading ? 'Se creează contul...' : 'Creează cont gratuit'}
+            required
+          />
+
+          <label htmlFor="register-name">Nume complet</label>
+          <input
+            id="register-name"
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="Ion Popescu"
+            disabled={loading}
+            required
+          />
+
+          <label htmlFor="register-email">Email</label>
+          <input
+            id="register-email"
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="nume@exemplu.ro"
+            disabled={loading}
+            required
+          />
+
+          <label htmlFor="register-password">Parolă</label>
+          <input
+            id="register-password"
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Minimum 6 caractere"
+            disabled={loading}
+            required
+          />
+
+          <label htmlFor="register-confirm-password">Confirmă parola</label>
+          <input
+            id="register-confirm-password"
+            type="password"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            placeholder="Rescrie parola"
+            disabled={loading}
+            required
+          />
+
+          <button type="submit" className="register-minimal-submit" disabled={loading}>
+            {loading ? 'Se creează contul...' : 'Creează cont'}
           </button>
         </form>
 
-        <div style={{ marginTop: '20px', textAlign: 'center' }}>
-          <p style={{ color: '#666', fontSize: '14px' }}>
-            Ai deja cont?{' '}
-            <span
-              onClick={onSwitchToLogin}
-              style={{ 
-                color: '#0066cc', 
-                cursor: loading ? 'not-allowed' : 'pointer', 
-                fontWeight: 'bold',
-                opacity: loading ? 0.5 : 1
-              }}
-            >
-              Autentifică-te
-            </span>
-          </p>
-        </div>
+        <p className="register-minimal-switch">
+          Ai deja cont? <Link to="/login">Autentifică-te</Link>
+        </p>
       </div>
-    </div>
+    </section>
   )
 }
 
