@@ -31,8 +31,55 @@ function Dashboard({ user, onLogout }) {
   const [savingSetari, setSavingSetari] = useState(false)
   const [statusSetari, setStatusSetari] = useState('')
   const [headerBrandName, setHeaderBrandName] = useState('')
+  const [copiedLinkId, setCopiedLinkId] = useState('')
 
   const masonryBreakpoints = { default: 4, 1200: 3, 800: 2, 500: 1 }
+  const galeriiSortate = [...galerii].sort((a, b) => {
+    const dateA = new Date(a.dataEveniment || 0).getTime()
+    const dateB = new Date(b.dataEveniment || 0).getTime()
+    return dateB - dateA
+  })
+
+  const getShortLink = (galerie) => {
+    const slug = (galerie.slug || '').trim()
+    return slug ? `/g/${slug}` : '/g/slug-lipsa'
+  }
+
+  const buildGallerySlug = (galerie) => {
+    const brandName = (
+      galerie.userName ||
+      headerBrandName ||
+      user?.name ||
+      user?.displayName ||
+      'fotograf'
+    ).trim()
+    const galleryName = (galerie.nume || 'galerie').trim()
+    const brandSlug = slugify(brandName, { lower: true, strict: true }) || 'fotograf'
+    const gallerySlug = slugify(galleryName, { lower: true, strict: true }) || 'galerie'
+    const uniqueSuffix = (galerie.id || Date.now().toString()).slice(0, 8).toLowerCase()
+    return `${brandSlug}-${gallerySlug}-${uniqueSuffix}`
+  }
+
+  const getPublicGalleryUrl = (galerie) => `${window.location.origin}${getShortLink(galerie)}`
+
+  const handleOpenShortLink = (galerie) => {
+    if (!galerie?.slug) return
+    window.open(getPublicGalleryUrl(galerie), '_blank', 'noopener,noreferrer')
+  }
+
+  const handleCopyShortLink = async (galerie) => {
+    if (!galerie?.slug) return
+
+    const publicUrl = getPublicGalleryUrl(galerie)
+
+    try {
+      await navigator.clipboard.writeText(publicUrl)
+      setCopiedLinkId(galerie.id)
+      setTimeout(() => setCopiedLinkId(''), 1500)
+    } catch (error) {
+      console.error('Nu am putut copia link-ul:', error)
+    }
+  }
 
   // 1. Efect pentru preluarea galeriilor din Firebase
   useEffect(() => {
@@ -44,6 +91,27 @@ function Dashboard({ user, onLogout }) {
     })
     return () => unsubscribe()
   }, [user?.uid])
+
+  useEffect(() => {
+    if (!user?.uid || galerii.length === 0) return
+
+    const galeriiFaraSlug = galerii.filter((galerie) => !(galerie.slug || '').trim())
+    if (galeriiFaraSlug.length === 0) return
+
+    const repairMissingSlugs = async () => {
+      try {
+        await Promise.all(
+          galeriiFaraSlug.map((galerie) =>
+            updateDoc(doc(db, 'galerii', galerie.id), { slug: buildGallerySlug(galerie) })
+          )
+        )
+      } catch (error) {
+        console.error('Eroare la repararea slug-urilor lipsă:', error)
+      }
+    }
+
+    repairMissingSlugs()
+  }, [galerii, user?.uid, headerBrandName, user?.name, user?.displayName])
 
   useEffect(() => {
     if (!user?.uid) return
@@ -414,35 +482,70 @@ function Dashboard({ user, onLogout }) {
             )}
 
             <div className="gallery-grid">
-              {galerii.map((g) => (
+              {loading && <div className="gallery-empty-state">Se încarcă galeriile...</div>}
+
+              {!loading && galeriiSortate.length === 0 && (
+                <div className="gallery-empty-state">Nu ai galerii create încă.</div>
+              )}
+
+              {!loading && galeriiSortate.map((g) => (
                 <div key={g.id} className={`gallery-card ${!g.statusActiv ? 'inactive' : ''}`}>
-                  <div 
-                    className="gallery-cover"
-                    style={{ 
-                      backgroundImage: g.coverUrl ? `url(${g.coverUrl})` : 'none'
-                    }}
-                  >
-                    <div className={`gallery-status ${g.statusActiv ? 'active' : 'inactive'}`}>
-                      {g.statusActiv ? 'ACTIV' : 'DEZACTIVAT'}
-                    </div>
-                    <div className="gallery-cover-info">
-                      <h3>{g.nume}</h3>
-                      <small>📅 {g.dataEveniment}</small>
-                    </div>
+                  <div className="gallery-card-top">
+                    <h3>{g.nume}</h3>
+                    <span className={`gallery-status-badge ${g.statusActiv ? 'active' : 'inactive'}`}>
+                      {g.statusActiv ? 'Activă' : 'Dezactivată'}
+                    </span>
                   </div>
+
+                  <div className="gallery-meta">
+                    <span className="gallery-label">Data</span>
+                    <span>{g.dataEveniment || 'Fără dată'}</span>
+                  </div>
+
+                  <div className="gallery-meta">
+                    <span className="gallery-label">Link</span>
+                    {g.slug ? (
+                      <>
+                        <a
+                          href={getShortLink(g)}
+                          className="gallery-short-link"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {getShortLink(g)}
+                        </a>
+                        <div className="gallery-link-actions">
+                          <button
+                            type="button"
+                            className="btn-link-action"
+                            onClick={() => handleOpenShortLink(g)}
+                          >
+                            Deschide
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-link-action secondary"
+                            onClick={() => handleCopyShortLink(g)}
+                          >
+                            {copiedLinkId === g.id ? 'Copiat!' : 'Copiază'}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="gallery-short-link missing">Generez link...</span>
+                    )}
+                  </div>
+
                   <div className="gallery-info">
                     <div className="gallery-stats">
                       <span>📸 <strong>{g.poze || 0}</strong> poze</span>
                       <span>❤️ <strong>{g.favorite?.length || 0}</strong> selecții</span>
-                      <span className={`stat-expiry ${g.dataExpirare ? 'has-expiry' : ''}`}>
-                        ⏳ {g.dataExpirare || 'Permanent'}
-                      </span>
                     </div>
                     <div className="gallery-actions">
                       <button className="btn-manage" onClick={() => handleDeschideGalerie(g)}>
                         GESTIONEAZĂ
                       </button>
-                      <button 
+                      <button
                         className="btn-toggle"
                         onClick={() => updateDoc(doc(db, 'galerii', g.id), { statusActiv: !g.statusActiv })}
                       >

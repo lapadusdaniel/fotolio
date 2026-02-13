@@ -137,6 +137,16 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 25px;
+    align-items: start;
+  }
+
+  .gallery-empty-state {
+    grid-column: 1 / -1;
+    padding: 20px 16px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+    color: #4b5563;
+    background: #fff;
   }
   
   .gallery-card {
@@ -146,6 +156,10 @@
     overflow: hidden;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
     transition: transform 0.18s ease, box-shadow 0.18s ease;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
   .gallery-card:hover {
@@ -156,60 +170,116 @@
   .gallery-card.inactive {
     opacity: 0.7;
   }
-  
-  .gallery-cover {
-    height: 180px;
-    background-color: #333;
-    background-size: cover;
-    background-position: center;
-    position: relative;
+
+  .gallery-card-top {
     display: flex;
-    align-items: flex-end;
-    padding: 20px;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
   }
-  
-  .gallery-status {
-    position: absolute;
-    top: 15px;
-    left: 15px;
-    color: white;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 10px;
-    font-weight: bold;
-  }
-  
-  .gallery-status.active {
-    background: #28a745;
-  }
-  
-  .gallery-status.inactive {
-    background: #666;
-  }
-  
-  .gallery-cover-info {
-    color: white;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-  }
-  
-  .gallery-cover-info h3 {
+
+  .gallery-card-top h3 {
     margin: 0;
     font-size: 18px;
+    font-weight: 600;
+    color: #111827;
   }
-  
-  .gallery-cover-info small {
-    opacity: 0.9;
+
+  .gallery-status-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+
+  .gallery-status-badge.active {
+    color: #0f5132;
+    background: #d1e7dd;
+    border-color: #b7dfca;
+  }
+
+  .gallery-status-badge.inactive {
+    color: #6b7280;
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+  }
+
+  .gallery-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: #374151;
+  }
+
+  .gallery-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9ca3af;
+  }
+
+  .gallery-short-link {
+    color: #111827;
+    text-decoration: none;
+    font-weight: 500;
+    word-break: break-all;
+  }
+
+  .gallery-short-link:hover {
+    text-decoration: underline;
+  }
+
+  .gallery-short-link.missing {
+    color: #9ca3af;
+    font-style: italic;
+  }
+
+  .gallery-link-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .btn-link-action {
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #111827;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+
+  .btn-link-action:hover {
+    background: #f8fafc;
+    border-color: #9ca3af;
+  }
+
+  .btn-link-action.secondary {
+    background: #111827;
+    color: #fff;
+    border-color: #111827;
+  }
+
+  .btn-link-action.secondary:hover {
+    background: #1f2937;
   }
   
   .gallery-info {
     background: #fdfdff;
-    padding: 20px;
+    padding-top: 14px;
+    border-top: 1px solid #eef2f7;
   }
   
   .gallery-stats {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 20px;
+    margin-bottom: 14px;
     font-size: 13px;
     color: #666;
   }
