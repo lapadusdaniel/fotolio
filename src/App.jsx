@@ -3,20 +3,30 @@ import './App.css'
 import Login from './components/login.jsx'
 import Register from './components/Register.jsx'
 import Dashboard from './components/Dashboard.jsx'
+import ClientGallery from './components/ClientGallery.jsx'
 import { auth } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 
 function App() {
+  // 1. Detectăm dacă suntem pe un link de galerie (ex: ?galerie=mada-si-dani)
+  const [galerieParam] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('galerie');
+    }
+    return null;
+  });
+
   const [paginaCurenta, setPaginaCurenta] = useState(() => {
     if (typeof window === 'undefined') return 'acasa'
     const saved = window.localStorage.getItem('paginaCurenta')
     return saved || 'acasa'
   })
-  const [authView, setAuthView] = useState(null) // null, 'login', 'register'
-  const [user, setUser] = useState(null) // null = nu e logat, object = logat
+  const [authView, setAuthView] = useState(null)
+  const [user, setUser] = useState(null)
   const [loadingAuth, setLoadingAuth] = useState(true)
 
-  // Ascultă permanent starea de autentificare din Firebase
+  // Ascultă starea de autentificare
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
@@ -34,80 +44,46 @@ function App() {
     return () => unsubscribe()
   }, [])
 
-  // Păstrează ultima pagină vizitată (inclusiv Dashboard) între refresh-uri
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('paginaCurenta', paginaCurenta)
     }
   }, [paginaCurenta])
 
-  // Handler pentru login
   const handleLogin = (userData) => {
-    setUser(userData)
-    setAuthView(null)
-    setPaginaCurenta('dashboard')
-    alert(`Bun venit, ${userData.name}! 🎉`)
+    setUser(userData); setAuthView(null); setPaginaCurenta('dashboard');
   }
 
-  // Handler pentru register
   const handleRegister = (userData) => {
-    setUser(userData)
-    setAuthView(null)
-    setPaginaCurenta('dashboard')
-    alert(`Cont creat cu succes! Bun venit, ${userData.name}! 🎉`)
+    setUser(userData); setAuthView(null); setPaginaCurenta('dashboard');
   }
 
-  // Handler pentru logout (și din Firebase Auth)
   const handleLogout = async () => {
     if (!window.confirm('Sigur vrei să te deconectezi?')) return
-
-    try {
-      await signOut(auth)
-    } catch (error) {
-      console.error('Eroare la deconectare:', error)
-    }
-
-    setUser(null)
-    setPaginaCurenta('acasa')
-    alert('Te-ai deconectat cu succes!')
+    try { await signOut(auth); } catch (e) { console.error(e); }
+    setUser(null); setPaginaCurenta('acasa');
   }
 
-  // Afișează Login/Register dacă sunt active
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  if (loadingAuth) return <div style={{textAlign: 'center', padding: '100px'}}>Se încarcă...</div>
+
+  // --- MACAZUL: Dacă e link de galerie, ignorăm tot restul site-ului ---
+  if (galerieParam) {
+    return <ClientGallery slug={galerieParam} />
+  }
+
+  // --- Login / Register Views ---
   if (authView === 'login') {
     return (
       <div style={{ fontFamily: 'Arial, sans-serif' }}>
-        <header style={{
-          backgroundColor: '#1a1a1a',
-          color: 'white',
-          padding: '20px 50px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <h1 
-            className="logo"
-            onClick={() => { setAuthView(null); setPaginaCurenta('acasa'); }}
-          >
-            Fotolio
-          </h1>
-          <button
-            onClick={() => setAuthView(null)}
-            style={{
-              backgroundColor: 'transparent',
-              border: '2px solid white',
-              color: 'white',
-              padding: '10px 20px',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            Înapoi
-          </button>
+        <header style={{ backgroundColor: '#1a1a1a', color: 'white', padding: '20px 50px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1 className="logo" onClick={() => { setAuthView(null); setPaginaCurenta('acasa'); }}>Fotolio</h1>
+          <button onClick={() => setAuthView(null)} style={{ backgroundColor: 'transparent', border: '2px solid white', color: 'white', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer' }}>Înapoi</button>
         </header>
-        <Login 
-          onLogin={handleLogin} 
-          onSwitchToRegister={() => setAuthView('register')}
-        />
+        <Login onLogin={handleLogin} onSwitchToRegister={() => setAuthView('register')} />
       </div>
     )
   }
@@ -115,43 +91,16 @@ function App() {
   if (authView === 'register') {
     return (
       <div style={{ fontFamily: 'Arial, sans-serif' }}>
-        <header style={{
-          backgroundColor: '#1a1a1a',
-          color: 'white',
-          padding: '20px 50px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <h1 
-            className="logo"
-            onClick={() => { setAuthView(null); setPaginaCurenta('acasa'); }}
-          >
-            Fotolio
-          </h1>
-          <button
-            onClick={() => setAuthView(null)}
-            style={{
-              backgroundColor: 'transparent',
-              border: '2px solid white',
-              color: 'white',
-              padding: '10px 20px',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            Înapoi
-          </button>
+        <header style={{ backgroundColor: '#1a1a1a', color: 'white', padding: '20px 50px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1 className="logo" onClick={() => { setAuthView(null); setPaginaCurenta('acasa'); }}>Fotolio</h1>
+          <button onClick={() => setAuthView(null)} style={{ backgroundColor: 'transparent', border: '2px solid white', color: 'white', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer' }}>Înapoi</button>
         </header>
-        <Register 
-          onRegister={handleRegister}
-          onSwitchToLogin={() => setAuthView('login')}
-        />
+        <Register onRegister={handleRegister} onSwitchToLogin={() => setAuthView('login')} />
       </div>
     )
   }
 
-  // Afișează Dashboard dacă e logat și pagina e dashboard
+  // --- Dashboard View ---
   if (user && paginaCurenta === 'dashboard') {
     return (
       <div style={{ fontFamily: 'Arial, sans-serif' }}>
@@ -160,438 +109,106 @@ function App() {
     )
   }
 
-  // Landing page normal
+  // --- Landing Page: One-Page Scroll ---
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif' }}>
-      {/* Header */}
-      <header style={{
-        backgroundColor: '#1a1a1a',
-        color: 'white',
-        padding: '20px 50px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <h1 
-          className="logo"
-          onClick={() => setPaginaCurenta('acasa')}
-        >
-          Fotolio
-        </h1>
-        
-        <nav style={{ display: 'flex', gap: '30px' }}>
-          <a 
-            href="#" 
-            onClick={(e) => { e.preventDefault(); setPaginaCurenta('acasa'); }}
-            className={paginaCurenta === 'acasa' ? 'nav-link nav-link-active' : 'nav-link'}
-          >
-            Acasă
-          </a>
-          <a 
-            href="#" 
-            onClick={(e) => { e.preventDefault(); setPaginaCurenta('portofoliu'); }}
-            className={paginaCurenta === 'portofoliu' ? 'nav-link nav-link-active' : 'nav-link'}
-          >
-            Portofoliu
-          </a>
-          <a 
-            href="#" 
-            onClick={(e) => { e.preventDefault(); setPaginaCurenta('preturi'); }}
-            className={paginaCurenta === 'preturi' ? 'nav-link nav-link-active' : 'nav-link'}
-          >
-            Prețuri
-          </a>
-          <a 
-            href="#" 
-            onClick={(e) => { e.preventDefault(); setPaginaCurenta('contact'); }}
-            className={paginaCurenta === 'contact' ? 'nav-link nav-link-active' : 'nav-link'}
-          >
-            Contact
-          </a>
+    <div style={{ fontFamily: 'Arial, sans-serif' }} className="landing-one-page">
+      <header className="landing-header">
+        <h1 className="logo" onClick={scrollToTop}>Fotolio</h1>
+        <nav className="landing-nav">
+          <a href="#despre-noi" className="nav-link">Despre Noi</a>
+          <a href="#preturi" className="nav-link">Prețuri</a>
+          <a href="#contact" className="nav-link">Contact</a>
         </nav>
-        
-        <div style={{ display: 'flex', gap: '15px' }}>
+        <div className="landing-auth-buttons">
           {user ? (
-            <>
-              <button
-                onClick={() => setPaginaCurenta('dashboard')}
-                style={{
-                  backgroundColor: 'transparent',
-                  border: '2px solid white',
-                  color: 'white',
-                  padding: '10px 20px',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={handleLogout}
-                style={{
-                  backgroundColor: '#dc3545',
-                  border: 'none',
-                  color: 'white',
-                  padding: '10px 20px',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                Deconectare
-              </button>
-            </>
+            <button onClick={() => setPaginaCurenta('dashboard')} className="btn-header">Dashboard</button>
           ) : (
             <>
-              <button
-                onClick={() => setAuthView('login')}
-                style={{
-                  backgroundColor: 'transparent',
-                  border: '2px solid white',
-                  color: 'white',
-                  padding: '10px 20px',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                Autentificare
-              </button>
-              <button 
-                onClick={() => setAuthView('register')}
-                className="btn-primary"
-                style={{ padding: '10px 20px', fontSize: '14px' }}
-              >
-                Înregistrare
-              </button>
+              <button onClick={() => setAuthView('login')} className="btn-header">Autentificare</button>
+              <button onClick={() => setAuthView('register')} className="btn-header btn-header-primary">Înregistrare</button>
             </>
           )}
         </div>
       </header>
 
-      {/* Pagina ACASĂ */}
-      {paginaCurenta === 'acasa' && (
-        <div className="page-content">
-          {/* Hero Section */}
-          <section style={{
-            textAlign: 'center',
-            padding: '100px 20px',
-            backgroundColor: '#f5f5f5'
-          }}>
-            <h2 style={{ fontSize: '48px', marginBottom: '20px' }}>
-              Platforma completă pentru fotografi
-            </h2>
-            <p style={{ fontSize: '20px', color: '#666', marginBottom: '40px' }}>
-              Portofoliu online, stocare nelimitată și management clienți - totul într-un singur loc
-            </p>
-            <button 
-              onClick={() => setAuthView('register')}
-              className="btn-primary"
-            >
-              Începe gratuit
-            </button>
-          </section>
+      <main>
+        {/* Hero */}
+        <section id="hero" className="landing-section landing-hero">
+          <h2 className="hero-title">Redă-ți timpul. Lasă fotografia să vorbească.</h2>
+          <p className="hero-subtitle">Galerii pentru clienți, stocare sigură, branding personalizat. Tot ce ai nevoie ca fotograf, fără complicații tehnice.</p>
+          <button onClick={() => setAuthView('register')} className="btn-primary btn-hero">Începe Gratuit</button>
+        </section>
 
-          {/* Features Section */}
-          <section style={{ padding: '80px 50px', backgroundColor: 'white' }}>
-            <h2 style={{ textAlign: 'center', fontSize: '36px', marginBottom: '60px' }}>
-              De ce Fotolio?
-            </h2>
-            
-            <div className="grid-3" style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '40px',
-              maxWidth: '1200px',
-              margin: '0 auto'
-            }}>
-              <div className="feature-card stagger-item">
-                <div className="feature-icon">📸</div>
-                <h3 style={{ marginBottom: '15px' }}>Portofoliu Profesional</h3>
-                <p style={{ color: '#666', lineHeight: '1.6' }}>
-                  Galerii organizate pe categorii - nunți, botezuri, corporate. Design modern și responsive.
-                </p>
-              </div>
-
-              <div className="feature-card stagger-item">
-                <div className="feature-icon">☁️</div>
-                <h3 style={{ marginBottom: '15px' }}>Stocare Nelimitată</h3>
-                <p style={{ color: '#666', lineHeight: '1.6' }}>
-                  Încarcă și livrează fotografii către clienți fără limite de spațiu.
-                </p>
-              </div>
-
-              <div className="feature-card stagger-item">
-                <div className="feature-icon">📅</div>
-                <h3 style={{ marginBottom: '15px' }}>Calendar Programări</h3>
-                <p style={{ color: '#666', lineHeight: '1.6' }}>
-                  Ține evidența evenimente și programări într-un singur loc.
-                </p>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {/* Pagina PORTOFOLIU */}
-      {paginaCurenta === 'portofoliu' && (
-        <div className="page-content">
-          <section style={{ padding: '80px 50px', minHeight: '60vh' }}>
-            <h2 style={{ textAlign: 'center', fontSize: '36px', marginBottom: '40px' }}>
-              Portofoliu
-            </h2>
-            <p style={{ textAlign: 'center', fontSize: '18px', color: '#666' }}>
-              Aici vor fi galeriile tale organizate pe categorii (Nunți, Botezuri, Corporate, etc.)
-            </p>
-            <p style={{ textAlign: 'center', fontSize: '14px', color: '#999', marginTop: '20px' }}>
-              📷 Coming soon - în următoarele lecții vom construi galeria!
-            </p>
-          </section>
-        </div>
-      )}
-
-      {/* Pagina PREȚURI */}
-      {paginaCurenta === 'preturi' && (
-        <div className="page-content">
-          <section style={{ padding: '80px 50px', backgroundColor: '#f5f5f5' }}>
-            <h2 style={{ textAlign: 'center', fontSize: '36px', marginBottom: '20px' }}>
-              Planuri și Prețuri
-            </h2>
-            <p style={{ textAlign: 'center', color: '#666', fontSize: '18px', marginBottom: '60px' }}>
-              Alege planul perfect pentru nevoile tale
-            </p>
-            
-            <div className="grid-3" style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '30px',
-              maxWidth: '1200px',
-              margin: '0 auto'
-            }}>
-              {/* Plan FREE */}
-              <div className="pricing-card">
-                <h3 style={{ fontSize: '24px', marginBottom: '10px' }}>Gratuit</h3>
-                <div style={{ fontSize: '48px', fontWeight: 'bold', margin: '20px 0' }}>
-                  0 <span style={{ fontSize: '20px', color: '#666' }}>lei</span>
-                </div>
-                <p style={{ color: '#666', marginBottom: '30px' }}>Perfect pentru început</p>
-                <ul style={{ textAlign: 'left', listStyle: 'none', marginBottom: '30px' }}>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>✓ 5GB stocare</li>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>✓ 1 galerie</li>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>✓ Portofoliu basic</li>
-                  <li style={{ padding: '10px 0' }}>✓ Branding Fotolio</li>
-                </ul>
-                <button 
-                  onClick={() => setAuthView('register')}
-                  className="btn-secondary"
-                  style={{ width: '100%' }}
-                >
-                  Începe Gratuit
-                </button>
-              </div>
-
-              {/* Plan PRO */}
-              <div className="pricing-card-pro">
-                <div style={{
-                  backgroundColor: '#ffcc00',
-                  color: '#0066cc',
-                  padding: '5px 15px',
-                  borderRadius: '20px',
-                  display: 'inline-block',
-                  marginBottom: '10px',
-                  fontWeight: 'bold',
-                  fontSize: '14px'
-                }}>POPULAR</div>
-                <h3 style={{ fontSize: '24px', marginBottom: '10px' }}>Pro</h3>
-                <div style={{ fontSize: '48px', fontWeight: 'bold', margin: '20px 0' }}>
-                  49 <span style={{ fontSize: '20px', opacity: 0.8 }}>lei/lună</span>
-                </div>
-                <p style={{ opacity: 0.9, marginBottom: '30px' }}>Pentru profesioniști</p>
-                <ul style={{ textAlign: 'left', listStyle: 'none', marginBottom: '30px' }}>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>✓ 100GB stocare</li>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>✓ Galerii nelimitate</li>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>✓ Domeniu personalizat</li>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>✓ Fără branding</li>
-                  <li style={{ padding: '10px 0' }}>✓ Calendar programări</li>
-                </ul>
-                <button 
-                  onClick={() => setAuthView('register')}
-                  style={{
-                    width: '100%',
-                    padding: '15px',
-                    backgroundColor: 'white',
-                    border: 'none',
-                    color: '#0066cc',
-                    borderRadius: '5px',
-                    fontSize: '16px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  Începe Perioada Gratuită
-                </button>
-              </div>
-
-              {/* Plan UNLIMITED */}
-              <div className="pricing-card">
-                <h3 style={{ fontSize: '24px', marginBottom: '10px' }}>Unlimited</h3>
-                <div style={{ fontSize: '48px', fontWeight: 'bold', margin: '20px 0' }}>
-                  99 <span style={{ fontSize: '20px', color: '#666' }}>lei/lună</span>
-                </div>
-                <p style={{ color: '#666', marginBottom: '30px' }}>Pentru agenții</p>
-                <ul style={{ textAlign: 'left', listStyle: 'none', marginBottom: '30px' }}>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>✓ Stocare NELIMITATĂ</li>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>✓ Tot din Pro +</li>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>✓ Conturi multiple</li>
-                  <li style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>✓ API access</li>
-                  <li style={{ padding: '10px 0' }}>✓ Support prioritar</li>
-                </ul>
-                <button 
-                  onClick={() => setPaginaCurenta('contact')}
-                  style={{
-                    width: '100%',
-                    padding: '15px',
-                    backgroundColor: '#1a1a1a',
-                    border: 'none',
-                    color: 'white',
-                    borderRadius: '5px',
-                    fontSize: '16px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  Contactează-ne
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {/* Pagina CONTACT */}
-      {paginaCurenta === 'contact' && (
-        <div className="page-content">
-          <section style={{ padding: '80px 50px', minHeight: '60vh', backgroundColor: 'white' }}>
-            <h2 style={{ textAlign: 'center', fontSize: '36px', marginBottom: '40px' }}>
-              Contactează-ne
-            </h2>
-            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-              <p style={{ textAlign: 'center', fontSize: '18px', color: '#666', marginBottom: '40px' }}>
-                Ai întrebări? Scrie-ne și îți răspundem în maxim 24h!
+        {/* Despre Noi */}
+        <section id="despre-noi" className="landing-section landing-despre">
+          <div className="despre-container">
+            <div className="despre-text">
+              <h2 className="section-title">Despre Noi</h2>
+              <p className="despre-lead">
+                Fotolio este o platformă creată de un fotograf, pentru fotografi. Știm cât de mult timp se pierde cu soluții tehnice complicate — link-uri care nu merg, servere care se blochează, formatări care distrug munca ta.
               </p>
-              <form onSubmit={(e) => { e.preventDefault(); alert('Mesaj trimis! 📧'); }}>
-                <input 
-                  type="text" 
-                  placeholder="Numele tău"
-                  required
-                />
-                <input 
-                  type="email" 
-                  placeholder="Email"
-                  required
-                />
-                <textarea 
-                  placeholder="Mesajul tău"
-                  rows="5"
-                  required
-                  style={{ fontFamily: 'Arial, sans-serif' }}
-                />
-                <button 
-                  type="submit"
-                  className="btn-primary"
-                  style={{ width: '100%' }}
-                >
-                  Trimite mesaj
-                </button>
-              </form>
+              <p className="despre-body">
+                Credem în prezență. Fotograful trebuie să fie <em>prezent</em> la eveniment, alături de oaspeți. Și <em>prezent</em> acasă, în viața de familie — nu blocat în fața monitorului, gestionând stocări nesigure sau mesaje de la clienți care nu găsesc pozele lor.
+              </p>
+              <p className="despre-body">
+                Am construit Fotolio pentru a fi rapid, intuitiv și invizibil. Folosim tehnologii moderne — React, Cloudflare — ca să te lăsăm să te concentrezi pe ceea ce contează: arta ta fotografică. Fără clișee, fără promisiuni goale. Doar un instrument care funcționează.
+              </p>
             </div>
-          </section>
-        </div>
-      )}
-
-      {/* Footer */}
-      <footer style={{
-        backgroundColor: '#1a1a1a',
-        color: 'white',
-        padding: '60px 50px 30px',
-      }}>
-        <div className="grid-4" style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '40px',
-          marginBottom: '40px'
-        }}>
-          <div>
-            <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Fotolio</h3>
-            <p style={{ color: '#999', lineHeight: '1.6', fontSize: '14px' }}>
-              Platforma românească pentru fotografi profesioniști. 
-              Construită de fotografi, pentru fotografi.
-            </p>
+            <div className="despre-visual">
+              <div className="despre-image-placeholder">
+                <span className="placeholder-icon">📷</span>
+                <span className="placeholder-text">Imagină lifestyle / echipament</span>
+              </div>
+            </div>
           </div>
+        </section>
 
-          <div>
-            <h4 style={{ marginBottom: '20px', fontSize: '16px' }}>Produse</h4>
-            <ul style={{ listStyle: 'none' }}>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" onClick={(e) => { e.preventDefault(); setPaginaCurenta('portofoliu'); }} style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>Portofoliu</a>
-              </li>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>Galerii</a>
-              </li>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>Calendar</a>
-              </li>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" onClick={(e) => { e.preventDefault(); setPaginaCurenta('preturi'); }} style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>Prețuri</a>
-              </li>
-            </ul>
+        {/* Prețuri */}
+        <section id="preturi" className="landing-section landing-preturi">
+          <h2 className="section-title">Planuri și Prețuri</h2>
+          <div className="pricing-grid">
+            <div className="pricing-card">
+              <h3>Gratuit</h3>
+              <div className="pricing-price">0 lei</div>
+              <p className="pricing-storage">25 GB stocare</p>
+              <button onClick={() => setAuthView('register')} className="btn-secondary" style={{ marginTop: '20px' }}>Începe acum</button>
+            </div>
+            <div className="pricing-card pricing-card-pro">
+              <h3>Pro</h3>
+              <div className="pricing-price">100 lei<span>/lună</span></div>
+              <p className="pricing-storage">500 GB stocare</p>
+              <button onClick={() => setAuthView('register')} className="btn-primary" style={{ marginTop: '20px', backgroundColor: 'white', color: '#0066cc' }}>Alege Pro</button>
+            </div>
+            <div className="pricing-card">
+              <h3>Unlimited</h3>
+              <div className="pricing-price">150 lei<span>/lună</span></div>
+              <p className="pricing-storage">1 TB stocare</p>
+              <button onClick={() => setAuthView('register')} className="btn-secondary" style={{ marginTop: '20px' }}>Alege Unlimited</button>
+            </div>
           </div>
+        </section>
 
-          <div>
-            <h4 style={{ marginBottom: '20px', fontSize: '16px' }}>Companie</h4>
-            <ul style={{ listStyle: 'none' }}>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>Despre noi</a>
-              </li>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>Blog</a>
-              </li>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>Cariere</a>
-              </li>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" onClick={(e) => { e.preventDefault(); setPaginaCurenta('contact'); }} style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>Contact</a>
-              </li>
-            </ul>
-          </div>
+        {/* Contact */}
+        <section id="contact" className="landing-section landing-contact">
+          <h2 className="section-title">Contact</h2>
+          <p className="contact-intro">Ai întrebări? Scrie-ne și îți răspundem în cel mai scurt timp.</p>
+          <form className="contact-form" onSubmit={(e) => e.preventDefault()}>
+            <div className="form-row">
+              <input type="text" placeholder="Nume" required />
+              <input type="email" placeholder="Email" required />
+            </div>
+            <textarea placeholder="Mesajul tău" rows="5" required></textarea>
+            <button type="submit" className="btn-primary">Trimite</button>
+          </form>
+        </section>
+      </main>
 
-          <div>
-            <h4 style={{ marginBottom: '20px', fontSize: '16px' }}>Legal</h4>
-            <ul style={{ listStyle: 'none' }}>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>Termeni și condiții</a>
-              </li>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>Politica de confidențialitate</a>
-              </li>
-              <li style={{ marginBottom: '10px' }}>
-                <a href="#" style={{ color: '#999', textDecoration: 'none', fontSize: '14px' }}>GDPR</a>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div style={{
-          borderTop: '1px solid #333',
-          paddingTop: '30px',
-          textAlign: 'center',
-          color: '#666',
-          fontSize: '14px'
-        }}>
-          © 2026 Fotolio. Toate drepturile rezervate. Made with ❤️ în România.
+      <footer className="landing-footer">
+        <div className="footer-content">
+          <div><h3>Fotolio</h3><p>Made with ❤️ în România.</p></div>
+          <div><h4>Produse</h4><p>Galerii</p><p>Portofoliu</p></div>
+          <div><h4>Companie</h4><p>Despre noi</p></div>
+          <div><h4>Legal</h4><p>GDPR</p></div>
         </div>
       </footer>
     </div>
