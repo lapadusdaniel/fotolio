@@ -6,20 +6,33 @@ import { auth, db } from '../firebase'
 import { signOut } from 'firebase/auth'
 import { collection, deleteDoc, doc, getDoc, setDoc, query, where, onSnapshot, updateDoc } from 'firebase/firestore'
 import { uploadPoza, listPoze, getPozaUrl, deletePoza } from '../r2'
-import { Contact, Instagram, Mail, MessageCircle } from 'lucide-react'
+import { 
+  Contact, 
+  Instagram, 
+  Mail, 
+  MessageCircle, 
+  CreditCard, 
+  Trash2, 
+  Layout, 
+  BarChart3, 
+  FileText, 
+  Settings as SettingsIcon 
+} from 'lucide-react'
 import AdminGalleryTable from './AdminGalleryTable'
 import GalleryDetailView from './GalleryDetailView'
 import Settings from '../pages/Settings'
+import SubscriptionSection from './SubscriptionSection'
+import SiteEditor from './SiteEditor'  // ← ADĂUGAT
 
 const SIDEBAR_TABS = [
-  { key: 'galerii', label: 'Galerii' },
+  { key: 'galerii', label: 'Galerii', icon: Layout },
   { key: 'card', label: 'Card', icon: Contact },
-  { key: 'trash', label: 'Coș de gunoi' },
-  { key: 'site', label: 'Site-ul meu (Beta)' },
-  { key: 'statistici', label: 'Statistici' },
-  { key: 'contracte', label: 'Contracte' },
-  { key: 'abonament', label: 'Abonament' },
-  { key: 'setari', label: 'Setări' }
+  { key: 'trash', label: 'Coș de gunoi', icon: Trash2 },
+  { key: 'site', label: 'Site-ul meu (Beta)', icon: Layout },
+  { key: 'statistici', label: 'Statistici', icon: BarChart3 },
+  { key: 'contracte', label: 'Contracte', icon: FileText },
+  { key: 'abonament', label: 'Abonament', icon: CreditCard },
+  { key: 'setari', label: 'Setări', icon: SettingsIcon }
 ]
 
 function Dashboard({ user, onLogout, initialTab }) {
@@ -33,6 +46,8 @@ function Dashboard({ user, onLogout, initialTab }) {
   const [loadingPoze, setLoadingPoze] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
+  
+  // Profile / Branding State
   const [profileData, setProfileData] = useState({
     numeBrand: '',
     slogan: '',
@@ -43,8 +58,10 @@ function Dashboard({ user, onLogout, initialTab }) {
   })
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileSaving, setProfileSaving] = useState(false)
+  
   const fileInputRef = useRef(null)
 
+  // Real-time listener pentru galerii
   useEffect(() => {
     if (!user?.uid) return
     const q = query(collection(db, 'galerii'), where('userId', '==', user.uid))
@@ -61,10 +78,12 @@ function Dashboard({ user, onLogout, initialTab }) {
     return () => unsubscribe()
   }, [user?.uid])
 
+  // Sync tab cu URL
   useEffect(() => {
     if (location.pathname === '/settings') setActiveTab('setari')
   }, [location.pathname])
 
+  // Update galerie activă dacă se schimbă datele în Firebase
   useEffect(() => {
     if (galerieActiva && galerii.length) {
       const updated = galerii.find((g) => g.id === galerieActiva.id)
@@ -72,6 +91,7 @@ function Dashboard({ user, onLogout, initialTab }) {
     }
   }, [galerii])
 
+  // Logica încărcare poze în galerie
   const handleDeschideGalerie = async (galerie) => {
     setGalerieActiva(galerie)
     setLoadingPoze(true)
@@ -100,6 +120,7 @@ function Dashboard({ user, onLogout, initialTab }) {
     }
   }
 
+  // Logica Upload (Original + Thumbnail)
   const handleUploadPoze = async (e) => {
     const files = Array.from(e.target.files)
     if (!files.length || !galerieActiva) return
@@ -115,7 +136,14 @@ function Dashboard({ user, onLogout, initialTab }) {
         const baseName = `${Date.now()}-${i}-${(file.name || 'image').replace(/[^a-zA-Z0-9.-]/g, '_')}`
         const origPath = `galerii/${galerieActiva.id}/originals/${baseName}`
         const thumbPath = `galerii/${galerieActiva.id}/thumbnails/${baseName.replace(/\.[^.]+$/, '')}.webp`
-        const thumbFile = await imageCompression(file, { maxSizeMB: 0.1, maxWidthOrHeight: 800, useWebWorker: true, fileType: 'image/webp' })
+        
+        const thumbFile = await imageCompression(file, { 
+          maxSizeMB: 0.1, 
+          maxWidthOrHeight: 800, 
+          useWebWorker: true, 
+          fileType: 'image/webp' 
+        })
+
         await Promise.all([
           uploadPoza(file, galerieActiva.id, user.uid, (p) => reportProgress(i * 2, p), origPath),
           uploadPoza(thumbFile, galerieActiva.id, user.uid, (p) => reportProgress(i * 2 + 1, p), thumbPath)
@@ -144,6 +172,7 @@ function Dashboard({ user, onLogout, initialTab }) {
     }
   }
 
+  // Management Galerii (Trash / Delete / Restore)
   const handleMoveToTrash = async (id) => {
     try {
       await updateDoc(doc(db, 'galerii', id), { status: 'trash', deletedAt: new Date() })
@@ -153,20 +182,15 @@ function Dashboard({ user, onLogout, initialTab }) {
       }
     } catch (error) {
       console.error('Error:', error)
-      alert('Eroare la ștergere!')
     }
   }
 
   const handleDeletePermanently = async (id) => {
+    if (!window.confirm('Această acțiune este ireversibilă. Ștergi definitiv?')) return
     try {
       await deleteDoc(doc(db, 'galerii', id))
-      if (galerieActiva?.id === id) {
-        setGalerieActiva(null)
-        setPozeGalerie([])
-      }
     } catch (error) {
       console.error('Error:', error)
-      alert('Eroare la ștergere!')
     }
   }
 
@@ -175,17 +199,14 @@ function Dashboard({ user, onLogout, initialTab }) {
       await updateDoc(doc(db, 'galerii', id), { status: 'active' })
     } catch (error) {
       console.error('Error:', error)
-      alert('Eroare la restaurare!')
     }
   }
 
   const handlePreview = (galerie) => {
     const url = galerie?.slug
       ? `${window.location.origin}/${galerie.slug}`
-      : galerie?.id
-        ? `${window.location.origin}/gallery/${galerie.id}`
-        : ''
-    if (url) window.open(url, '_blank')
+      : `${window.location.origin}/gallery/${galerie.id}`
+    window.open(url, '_blank')
   }
 
   const handleLogout = async () => {
@@ -199,6 +220,7 @@ function Dashboard({ user, onLogout, initialTab }) {
     }
   }
 
+  // Branding Card Logic
   const profileRef = () => doc(db, 'users', user.uid, 'settings', 'profile')
 
   useEffect(() => {
@@ -226,35 +248,13 @@ function Dashboard({ user, onLogout, initialTab }) {
     e?.preventDefault?.()
     setProfileSaving(true)
     try {
-      await setDoc(
-        profileRef(),
-        {
-          numeBrand: profileData.numeBrand.trim(),
-          slogan: profileData.slogan.trim(),
-          whatsapp: profileData.whatsapp.trim(),
-          instagram: profileData.instagram.trim(),
-          email: profileData.email.trim(),
-          website: profileData.website.trim(),
-          updatedAt: new Date()
-        },
-        { merge: true }
-      )
+      await setDoc(profileRef(), { ...profileData, updatedAt: new Date() }, { merge: true })
       alert('Modificările au fost salvate.')
     } catch (err) {
       console.error('Error:', err)
-      alert('Eroare la salvare.')
     } finally {
       setProfileSaving(false)
     }
-  }
-
-  const cardLinkSlug = profileData.numeBrand
-    ? profileData.numeBrand.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '') || 'brand'
-    : 'brand-ul-tau'
-  const cardLinkUrl = `https://fotolio.app/${cardLinkSlug}`
-
-  const handleCopyCardLink = () => {
-    navigator.clipboard?.writeText(cardLinkUrl).then(() => alert('Link copiat!'))
   }
 
   const userInitial = (user?.name || 'U').charAt(0).toUpperCase()
@@ -262,13 +262,7 @@ function Dashboard({ user, onLogout, initialTab }) {
   const renderSidebar = () => (
     <div className="dashboard-sidebar">
       <div className="sidebar-logo-area">
-        <h1
-          className="dashboard-logo"
-          onClick={() => {
-            setGalerieActiva(null)
-            setActiveTab('galerii')
-          }}
-        >
+        <h1 className="dashboard-logo" onClick={() => { setGalerieActiva(null); setActiveTab('galerii') }}>
           Fotolio
         </h1>
       </div>
@@ -292,6 +286,7 @@ function Dashboard({ user, onLogout, initialTab }) {
   )
 
   const renderMainContent = () => {
+    // Vizualizare poze într-o galerie specifică
     if (galerieActiva) {
       return (
         <GalleryDetailView
@@ -302,10 +297,7 @@ function Dashboard({ user, onLogout, initialTab }) {
           uploading={uploading}
           uploadProgress={uploadProgress}
           fileInputRef={fileInputRef}
-          onBack={() => {
-            setGalerieActiva(null)
-            setPozeGalerie([])
-          }}
+          onBack={() => { setGalerieActiva(null); setPozeGalerie([]) }}
           onUploadPoze={handleUploadPoze}
           onDeletePoza={handleDeletePoza}
         />
@@ -322,15 +314,16 @@ function Dashboard({ user, onLogout, initialTab }) {
               <div className="dashboard-avatar-wrap" title={user?.email}>
                 <div className="dashboard-avatar">{userInitial}</div>
               </div>
-              <span className="dashboard-profile-name">{user?.name || 'Fotograf'}</span>
-              <span className="dashboard-profile-email">{user?.email}</span>
+              <div className="dashboard-profile-info">
+                <span className="dashboard-profile-name">{user?.name || 'Fotograf'}</span>
+                <span className="dashboard-profile-email">{user?.email}</span>
+              </div>
             </div>
-            <button onClick={handleLogout} className="dashboard-logout-link">
-              Ieșire
-            </button>
+            <button onClick={handleLogout} className="dashboard-logout-link">Ieșire</button>
           </div>
         </header>
 
+        {/* Tab-uri Galerii / Coș */}
         {(activeTab === 'galerii' || activeTab === 'trash') && (
           <AdminGalleryTable
             user={user}
@@ -345,22 +338,22 @@ function Dashboard({ user, onLogout, initialTab }) {
           />
         )}
 
+        {/* Tab Branding / Card */}
         {activeTab === 'card' && (
           <div className="brand-card-container">
             <div className="brand-card-editor">
               <h2 className="brand-card-title">Identitate de brand</h2>
               {profileLoading ? (
-                <p className="brand-card-loading">Se încarcă...</p>
+                <p>Se încarcă...</p>
               ) : (
                 <form onSubmit={saveProfileSettings} className="brand-card-form">
                   <div className="brand-card-form-group">
-                    <label>Nume</label>
+                    <label>Nume Brand</label>
                     <input
                       type="text"
                       value={profileData.numeBrand}
-                      onChange={(e) => setProfileData((p) => ({ ...p, numeBrand: e.target.value }))}
+                      onChange={(e) => setProfileData(p => ({ ...p, numeBrand: e.target.value }))}
                       placeholder="Ex: Studio Foto XYZ"
-                      className="brand-card-input"
                     />
                   </div>
                   <div className="brand-card-form-group">
@@ -368,100 +361,59 @@ function Dashboard({ user, onLogout, initialTab }) {
                     <input
                       type="text"
                       value={profileData.slogan}
-                      onChange={(e) => setProfileData((p) => ({ ...p, slogan: e.target.value }))}
-                      placeholder="Ex: Fotografii care spun povesti"
-                      className="brand-card-input"
+                      onChange={(e) => setProfileData(p => ({ ...p, slogan: e.target.value }))}
+                      placeholder="Ex: Fotografii care spun povești"
                     />
                   </div>
                   <div className="brand-card-form-group">
-                    <label>Contact</label>
+                    <label>WhatsApp / Instagram / Email</label>
                     <input
                       type="tel"
                       value={profileData.whatsapp}
-                      onChange={(e) => setProfileData((p) => ({ ...p, whatsapp: e.target.value }))}
-                      placeholder="WhatsApp: +40 712 345 678"
-                      className="brand-card-input"
+                      onChange={(e) => setProfileData(p => ({ ...p, whatsapp: e.target.value }))}
+                      placeholder="WhatsApp"
                     />
                     <input
                       type="text"
                       value={profileData.instagram}
-                      onChange={(e) => setProfileData((p) => ({ ...p, instagram: e.target.value }))}
-                      placeholder="Instagram: @fotograful_meu"
-                      className="brand-card-input"
+                      onChange={(e) => setProfileData(p => ({ ...p, instagram: e.target.value }))}
+                      placeholder="Instagram"
                     />
                     <input
                       type="email"
                       value={profileData.email}
-                      onChange={(e) => setProfileData((p) => ({ ...p, email: e.target.value }))}
-                      placeholder="Email: contact@studiu.ro"
-                      className="brand-card-input"
-                    />
-                    <input
-                      type="url"
-                      value={profileData.website}
-                      onChange={(e) => setProfileData((p) => ({ ...p, website: e.target.value }))}
-                      placeholder="Website: www.exemplu.ro"
-                      className="brand-card-input"
+                      onChange={(e) => setProfileData(p => ({ ...p, email: e.target.value }))}
+                      placeholder="Email de contact"
                     />
                   </div>
-                  <button type="submit" className="btn-primary brand-card-save" disabled={profileSaving}>
-                    {profileSaving ? 'Se salvează...' : 'Salvează în Cloud'}
+                  <button type="submit" className="btn-primary" disabled={profileSaving}>
+                    {profileSaving ? 'Se salvează...' : 'Salvează modificările'}
                   </button>
                 </form>
               )}
             </div>
-            <div className="brand-card-preview-wrap">
-              <div className="brand-card-preview">
-                <div className="brand-card-avatar" />
-                <h3 className="brand-card-preview-name">{profileData.numeBrand || 'Nume Brand'}</h3>
-                {profileData.slogan && <p className="brand-card-preview-slogan">{profileData.slogan}</p>}
-                <div className="brand-card-preview-social">
-                  {profileData.whatsapp && (
-                    <a
-                      href={`https://wa.me/${profileData.whatsapp.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="brand-card-social-btn"
-                      title="WhatsApp"
-                    >
-                      <MessageCircle size={18} />
-                    </a>
-                  )}
-                  {profileData.instagram && (
-                    <a
-                      href={`https://instagram.com/${profileData.instagram.replace(/^@/, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="brand-card-social-btn"
-                      title="Instagram"
-                    >
-                      <Instagram size={18} />
-                    </a>
-                  )}
-                  {profileData.email && (
-                    <a href={`mailto:${profileData.email}`} className="brand-card-social-btn" title="Email">
-                      <Mail size={18} />
-                    </a>
-                  )}
-                  {!profileData.whatsapp && !profileData.instagram && !profileData.email && (
-                    <span className="brand-card-social-empty">Adaugă contacte</span>
-                  )}
-                </div>
-              </div>
-              <button type="button" onClick={handleCopyCardLink} className="brand-card-copy-link">
-                Copiază link-ul cărții de vizită
-              </button>
-            </div>
           </div>
         )}
 
-        {activeTab === 'setari' && (
-          <Settings user={user} />
+        {/* Tab Site ── ADĂUGAT */}
+        {activeTab === 'site' && (
+          <SiteEditor user={user} userGalleries={galerii} />
         )}
 
-        {activeTab !== 'galerii' && activeTab !== 'trash' && activeTab !== 'card' && activeTab !== 'setari' && (
+        {/* Tab Setări Generale */}
+        {activeTab === 'setari' && <Settings user={user} />}
+
+        {/* Tab Abonament */}
+        {activeTab === 'abonament' && (
+          <div style={{ width: '100%', padding: '20px 40px' }}>
+            <SubscriptionSection user={user} />
+          </div>
+        )}
+
+        {/* Placeholder pentru tab-uri în lucru */}
+        {['statistici', 'contracte'].includes(activeTab) && (
           <div className="dashboard-tab-placeholder">
-            Secțiunea {activeTabLabel} urmează să fie implementată
+            Secțiunea {activeTabLabel} urmează să fie implementată.
           </div>
         )}
       </>
