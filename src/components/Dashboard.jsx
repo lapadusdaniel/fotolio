@@ -6,7 +6,9 @@ import { auth, db } from '../firebase'
 import { signOut } from 'firebase/auth'
 import { collection, deleteDoc, doc, getDoc, setDoc, query, where, onSnapshot, updateDoc } from 'firebase/firestore'
 import { uploadPoza, listPoze, getPozaUrl, deletePoza } from '../r2'
+import { useUserSubscription } from '../hooks/useUserSubscription'
 import { 
+  Check,
   Contact, 
   Instagram, 
   Mail, 
@@ -22,7 +24,7 @@ import AdminGalleryTable from './AdminGalleryTable'
 import GalleryDetailView from './GalleryDetailView'
 import Settings from '../pages/Settings'
 import SubscriptionSection from './SubscriptionSection'
-import SiteEditor from './SiteEditor'  // ← ADĂUGAT
+import SiteEditor from './SiteEditor'
 
 const SIDEBAR_TABS = [
   { key: 'galerii', label: 'Galerii', icon: Layout },
@@ -46,7 +48,19 @@ function Dashboard({ user, onLogout, initialTab }) {
   const [loadingPoze, setLoadingPoze] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
-  
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
+
+  const { userPlan, storageLimit, checkAccess } = useUserSubscription(user?.uid)
+
+  // Show success modal when returning from Stripe with ?payment=success
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('payment') === 'success') {
+      setShowPaymentSuccess(true)
+      navigate(location.pathname, { replace: true })
+    }
+  }, [location.search, location.pathname, navigate])
+
   // Profile / Branding State
   const [profileData, setProfileData] = useState({
     numeBrand: '',
@@ -330,6 +344,8 @@ function Dashboard({ user, onLogout, initialTab }) {
             galerii={galerii}
             loading={loading}
             activeTab={activeTab}
+            userPlan={userPlan}
+            storageLimit={storageLimit}
             onDeschideGalerie={handleDeschideGalerie}
             onMoveToTrash={handleMoveToTrash}
             onDeletePermanently={handleDeletePermanently}
@@ -406,7 +422,7 @@ function Dashboard({ user, onLogout, initialTab }) {
         {/* Tab Abonament */}
         {activeTab === 'abonament' && (
           <div style={{ width: '100%', padding: '20px 40px' }}>
-            <SubscriptionSection user={user} />
+            <SubscriptionSection user={user} userPlan={userPlan} storageLimit={storageLimit} checkAccess={checkAccess} />
           </div>
         )}
 
@@ -426,6 +442,21 @@ function Dashboard({ user, onLogout, initialTab }) {
       <div className={`dashboard-main-content ${!galerieActiva ? 'page-content dashboard-app' : ''}`}>
         {renderMainContent()}
       </div>
+
+      {showPaymentSuccess && (
+        <div className="dashboard-payment-success-overlay" onClick={() => setShowPaymentSuccess(false)}>
+          <div className="dashboard-payment-success-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="dashboard-payment-success-icon">
+              <Check size={28} strokeWidth={2.5} />
+            </div>
+            <h3>Plata a fost primită</h3>
+            <p>Contul tău a fost actualizat. Bine ai revenit în Fotolio.</p>
+            <button type="button" onClick={() => setShowPaymentSuccess(false)}>
+              Înțeles
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

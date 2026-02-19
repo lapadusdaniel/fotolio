@@ -10,7 +10,7 @@ import { ImagePlus, Users, Heart } from 'lucide-react'
 import './Dashboard.css'
 
 const PINNED_STORAGE_KEY = 'fotolio-pinned-galleries'
-const PLAN_LIMITS_GB = { Free: 25, Pro: 500, Unlimited: 1000 }
+const PLAN_LIMITS_GB = { Free: 15, Pro: 500, Unlimited: 1000 }
 
 const IconViews = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -298,6 +298,8 @@ export default function AdminGalleryTable({
   galerii,
   loading,
   activeTab,
+  userPlan: userPlanProp,
+  storageLimit: storageLimitProp,
   onDeschideGalerie,
   onMoveToTrash,
   onDeletePermanently,
@@ -461,8 +463,8 @@ export default function AdminGalleryTable({
   }, [activeTab])
 
   const totalPoze = galerii.reduce((sum, g) => sum + (g?.poze || 0), 0)
-  const planName = user?.plan || 'Free'
-  const planLimitGB = PLAN_LIMITS_GB[planName] ?? 25
+  const planName = userPlanProp ?? user?.plan ?? 'Free'
+  const planLimitGB = storageLimitProp ?? PLAN_LIMITS_GB[planName] ?? 15
   const storageUsedGB = 0.1
   const storagePercent = Math.min(100, (storageUsedGB / planLimitGB) * 100)
 
