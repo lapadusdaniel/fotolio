@@ -20,6 +20,25 @@ export default function AdminGalleryForm({ user, onSuccess, onCancel, disabled, 
   const [formUploading, setFormUploading] = useState(false)
   const formFileInputRef = useRef(null)
 
+  // Folder management state
+  const [folders, setFolders] = useState([])
+  const [newFolderInput, setNewFolderInput] = useState('')
+
+  const handleAddFolder = () => {
+    const name = newFolderInput.trim()
+    if (!name || folders.includes(name)) return
+    setFolders(prev => [...prev, name])
+    setNewFolderInput('')
+  }
+
+  const handleRemoveFolder = (name) => {
+    setFolders(prev => prev.filter(f => f !== name))
+  }
+
+  const handleFolderKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); handleAddFolder() }
+  }
+
   useEffect(() => {
     if (!formFiles.length) {
       setFormFileUrls([])
@@ -55,7 +74,9 @@ export default function AdminGalleryForm({ user, onSuccess, onCancel, disabled, 
         data: new Date().toISOString(),
         createdAt: new Date(),
         status: 'active',
-        statusActiv: true
+        statusActiv: true,
+        folders: folders,
+        photoFolders: {}
       }
       if (dataEveniment) docData.dataEveniment = new Date(dataEveniment).toISOString()
       if (dataExpirare) docData.dataExpirare = new Date(dataExpirare).toISOString()
@@ -113,6 +134,7 @@ export default function AdminGalleryForm({ user, onSuccess, onCancel, disabled, 
       setDataEveniment('')
       setDataExpirare('')
       setFormFiles([])
+      setFolders([])
       if (formFileInputRef.current) formFileInputRef.current.value = ''
       onSuccess?.()
     } catch (error) {
@@ -135,6 +157,28 @@ export default function AdminGalleryForm({ user, onSuccess, onCancel, disabled, 
 
   const removeFormFile = (index) => {
     setFormFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const folderPillStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '4px 12px',
+    borderRadius: '100px',
+    background: '#f5f5f7',
+    color: '#3a3a3c',
+    fontSize: '13px',
+    fontFamily: "'DM Sans', sans-serif",
+  }
+
+  const folderPillRemoveStyle = {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '15px',
+    lineHeight: 1,
+    color: '#6e6e73',
+    padding: '0 2px',
   }
 
   return (
@@ -192,6 +236,40 @@ export default function AdminGalleryForm({ user, onSuccess, onCancel, disabled, 
           />
         </div>
       </div>
+      {/* Folder management section */}
+      <div style={{ marginBottom: '16px' }}>
+        <label>Foldere galerie</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px', marginBottom: '8px' }}>
+          {folders.map((folder) => (
+            <span key={folder} style={folderPillStyle}>
+              {folder}
+              <button
+                type="button"
+                onClick={() => handleRemoveFolder(folder)}
+                style={folderPillRemoveStyle}
+                aria-label={`Elimină ${folder}`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input
+            type="text"
+            value={newFolderInput}
+            onChange={(e) => setNewFolderInput(e.target.value)}
+            onKeyDown={handleFolderKeyDown}
+            placeholder="Ex: Pregătiri"
+            className="gallery-add-input"
+            style={{ flex: 1 }}
+          />
+          <button type="button" onClick={handleAddFolder} className="btn-secondary" style={{ whiteSpace: 'nowrap' }}>
+            + Adaugă folder
+          </button>
+        </div>
+      </div>
+
       <div className="gallery-add-upload">
         <label>Fotografii</label>
         <input
