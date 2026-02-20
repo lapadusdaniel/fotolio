@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard.jsx'
 import ClientGallery from './components/ClientGallery.jsx'
 import PhotographerSite from './components/PhotographerSite.jsx'
 import LandingPage from './components/LandingPage.jsx'
+import AdminPanel from './components/AdminPanel.jsx' // ← IMPORTUL ADAUGAT PENTRU ADMIN
 import { auth, db } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { collection, query, where, getDocs } from 'firebase/firestore'
@@ -154,6 +155,7 @@ function App() {
       <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <AuthLayout><Register onRegister={handleRegister} onSwitchToLogin={() => navigate('/login')} /></AuthLayout>} />
       <Route path="/dashboard" element={<ProtectedDashboard user={user} onLogout={handleLogout} />} />
       <Route path="/settings" element={<ProtectedDashboard user={user} onLogout={handleLogout} initialTab="setari" />} />
+      <Route path="/admin" element={<AdminPanel user={user} />} /> {/* ← RUTA ADAUGATA PENTRU ADMIN */}
       <Route path="/gallery/:id" element={<ClientGallery />} />
       <Route path="/" element={<LandingPage user={user} />} />
       <Route path="/:slug" element={<SlugRouter />} />

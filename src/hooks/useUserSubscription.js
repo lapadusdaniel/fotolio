@@ -1,14 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { db } from '../firebase'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { collection, onSnapshot, doc } from 'firebase/firestore' // Am adăugat doc
 
-/** Stripe Price IDs → Plan mapping */
 export const PLAN_PRICES = {
   PRO: 'price_1T2HFN1pBe1FB1ICkWaITkCD',
   UNLIMITED: 'price_1T2ao81pBe1FB1ICFjI0SVUb'
 }
 
-/** Plan → storage limit (GB) */
 export const STORAGE_LIMITS = {
   Free: 15,
   Pro: 500,
@@ -17,9 +15,6 @@ export const STORAGE_LIMITS = {
 
 const VALID_STATUSES = ['active', 'trialing']
 
-/**
- * Derives userPlan from a Stripe price ID
- */
 function priceIdToPlan(priceId) {
   if (!priceId) return 'Free'
   if (priceId === PLAN_PRICES.UNLIMITED) return 'Unlimited'
@@ -27,10 +22,6 @@ function priceIdToPlan(priceId) {
   return 'Free'
 }
 
-/**
- * Extracts the first relevant price ID from a subscription document
- * Supports common Stripe Extension structures: items[].price.id or price.id
- */
 function getPriceIdFromSubscription(docData) {
   if (!docData) return null
   const items = docData.items?.data ?? docData.items
@@ -42,13 +33,6 @@ function getPriceIdFromSubscription(docData) {
   return null
 }
 
-/**
- * Real-time subscription hook. Listens to customers/{uid}/subscriptions
- * and derives userPlan + storageLimit.
- *
- * @param {string} uid - Firebase Auth UID
- * @returns {{ userPlan: 'Free'|'Pro'|'Unlimited', storageLimit: number, loading: boolean }}
- */
 export function useUserSubscription(uid) {
   const [userPlan, setUserPlan] = useState('Free')
   const [storageLimit, setStorageLimit] = useState(STORAGE_LIMITS.Free)
@@ -62,32 +46,52 @@ export function useUserSubscription(uid) {
       return
     }
 
-    const subsRef = collection(db, 'customers', uid, 'subscriptions')
-    const unsubscribe = onSnapshot(subsRef, (snapshot) => {
-      let plan = 'Free'
+    let unsubStripe = null;
 
-      snapshot.docs.forEach((docSnap) => {
-        const data = docSnap.data()
-        const status = (data?.status || '').toLowerCase()
-        if (!VALID_STATUSES.includes(status)) return
+    // 1. Ascultăm în timp real după OVERRIDE (Setat din Admin Panel)
+    const unsubOverride = onSnapshot(doc(db, 'adminOverrides', uid), (overrideSnap) => {
+      if (overrideSnap.exists() && overrideSnap.data().plan) {
+        // Dacă există un plan setat manual de tine, îl folosim direct
+        const overridePlan = overrideSnap.data().plan
+        setUserPlan(overridePlan)
+        setStorageLimit(STORAGE_LIMITS[overridePlan] || STORAGE_LIMITS.Free)
+        setLoading(false)
 
-        const priceId = getPriceIdFromSubscription(data)
-        const derived = priceIdToPlan(priceId)
-        if (derived === 'Unlimited') plan = 'Unlimited'
-        else if (derived === 'Pro' && plan !== 'Unlimited') plan = 'Pro'
-      })
+        // Dacă avem override, oprim ascultarea Stripe (pentru a economisi resurse)
+        if (unsubStripe) {
+          unsubStripe()
+          unsubStripe = null
+        }
+      } else {
+        // 2. Dacă NU există override, ascultăm subscripțiile din Stripe
+        if (!unsubStripe) {
+          const subsRef = collection(db, 'customers', uid, 'subscriptions')
+          unsubStripe = onSnapshot(subsRef, (snapshot) => {
+            let plan = 'Free'
+            snapshot.docs.forEach((docSnap) => {
+              const data = docSnap.data()
+              const status = (data?.status || '').toLowerCase()
+              if (!VALID_STATUSES.includes(status)) return
 
-      setUserPlan(plan)
-      setStorageLimit(STORAGE_LIMITS[plan] ?? STORAGE_LIMITS.Free)
-      setLoading(false)
-    }, (err) => {
-      console.error('useUserSubscription error:', err)
-      setUserPlan('Free')
-      setStorageLimit(STORAGE_LIMITS.Free)
-      setLoading(false)
+              const priceId = getPriceIdFromSubscription(data)
+              const derived = priceIdToPlan(priceId)
+              if (derived === 'Unlimited') plan = 'Unlimited'
+              else if (derived === 'Pro' && plan !== 'Unlimited') plan = 'Pro'
+            })
+
+            setUserPlan(plan)
+            setStorageLimit(STORAGE_LIMITS[plan] ?? STORAGE_LIMITS.Free)
+            setLoading(false)
+          })
+        }
+      }
     })
 
-    return () => unsubscribe()
+    // Curățăm ambele ascultări când componenta se închide
+    return () => {
+      if (unsubOverride) unsubOverride()
+      if (unsubStripe) unsubStripe()
+    }
   }, [uid])
 
   const checkAccess = useCallback((feature) => {
