@@ -6,7 +6,7 @@ import { Zoom, Thumbnails } from 'yet-another-react-lightbox/plugins';
 import 'yet-another-react-lightbox/plugins/thumbnails.css';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, getDoc, updateDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { listPoze, getPozaUrl, getBrandingUrl } from '../r2';
+import { listPoze, getPozaUrl, getPozaBlob, getBrandingUrl } from '../r2';
 import Masonry from 'react-masonry-css';
 import { ChevronDown, Share2, Download, Heart, Clock, Instagram, MessageCircle, Loader2 } from 'lucide-react';
 
@@ -27,14 +27,31 @@ function useIsMobile(breakpoint = 768) {
 }
 
 async function downloadOriginalImage(pozaKey, filename) {
-  const blobUrl = await getPozaUrl(pozaKey, 'original');
-  const link = document.createElement('a');
-  link.href = blobUrl;
-  link.download = filename || pozaKey.split('/').pop() || 'image';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(blobUrl);
+  const blob = await getPozaBlob(pozaKey, 'original');
+  const safeName = filename || pozaKey.split('/').pop() || 'image';
+  const file = new File([blob], safeName.includes('.') ? safeName : `${safeName}.jpg`, { type: blob.type || 'image/jpeg' });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: safeName });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      console.warn('Share failed, falling back to download:', e);
+    }
+  }
+
+  const blobUrl = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = safeName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
 }
 
 function LazyGalleryImage({ pozaKey, index, isFav, onFavoriteClick, onClick, accentColor }) {

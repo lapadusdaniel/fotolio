@@ -111,6 +111,19 @@ export const getPozaUrl = async (fileName, type = 'original') => {
   return URL.createObjectURL(blob)
 }
 
+/** Returns the raw Blob for a poza (for Web Share API, etc.). */
+export const getPozaBlob = async (fileName, type = 'original') => {
+  if (!fileName) throw new Error('getPozaBlob: fileName este obligatoriu')
+  const path = resolvePath(fileName, type)
+  const url = `${WORKER_URL}${encodeURIComponent(path)}`
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${AUTH_TOKEN}` }
+  })
+  if (!response.ok) throw new Error(`Get failed: ${response.status}`)
+  return response.blob()
+}
+
 /** Returns URL for full-resolution/original image. Use for high-res downloads. */
 export const getPozaUrlOriginal = async (fileName) => {
   if (!fileName) throw new Error('getPozaUrlOriginal: fileName este obligatoriu')
