@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import imageCompression from 'browser-image-compression'
 import './Dashboard.css'
 import { auth, db } from '../firebase'
@@ -40,7 +40,8 @@ const SIDEBAR_TABS = [
 function Dashboard({ user, onLogout, initialTab }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [activeTab, setActiveTab] = useState(initialTab || (location.pathname === '/settings' ? 'setari' : 'galerii'))
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = location.pathname === '/settings' ? 'setari' : (searchParams.get('tab') || initialTab || 'galerii')
   const [galerii, setGalerii] = useState([])
   const [loading, setLoading] = useState(true)
   const [galerieActiva, setGalerieActiva] = useState(null)
@@ -92,11 +93,6 @@ function Dashboard({ user, onLogout, initialTab }) {
     return () => unsubscribe()
   }, [user?.uid])
 
-  // Sync tab cu URL
-  useEffect(() => {
-    if (location.pathname === '/settings') setActiveTab('setari')
-  }, [location.pathname])
-
   // Update galerie activă dacă se schimbă datele în Firebase
   useEffect(() => {
     if (galerieActiva && galerii.length) {
@@ -134,13 +130,13 @@ function Dashboard({ user, onLogout, initialTab }) {
     }
   }
 
-  // Logica Upload (Original + Thumbnail)
+  // Logica Upload (Original + Medium + Thumb)
   const handleUploadPoze = async (e) => {
     const files = Array.from(e.target.files)
     if (!files.length || !galerieActiva) return
     setUploading(true)
     setUploadProgress(0)
-    const totalSteps = files.length * 2
+    const totalSteps = files.length * 3
     const reportProgress = (stepIndex, percent) => {
       setUploadProgress(Math.round(((stepIndex + percent / 100) / totalSteps) * 100))
     }
@@ -148,19 +144,20 @@ function Dashboard({ user, onLogout, initialTab }) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         const baseName = `${Date.now()}-${i}-${(file.name || 'image').replace(/[^a-zA-Z0-9.-]/g, '_')}`
+        const baseNameNoExt = baseName.replace(/\.[^.]+$/, '')
         const origPath = `galerii/${galerieActiva.id}/originals/${baseName}`
-        const thumbPath = `galerii/${galerieActiva.id}/thumbnails/${baseName.replace(/\.[^.]+$/, '')}.webp`
-        
-        const thumbFile = await imageCompression(file, { 
-          maxSizeMB: 0.1, 
-          maxWidthOrHeight: 800, 
-          useWebWorker: true, 
-          fileType: 'image/webp' 
-        })
+        const mediumPath = `galerii/${galerieActiva.id}/medium/${baseNameNoExt}.webp`
+        const thumbPath = `galerii/${galerieActiva.id}/thumbnails/${baseNameNoExt}.webp`
+
+        const [mediumFile, thumbFile] = await Promise.all([
+          imageCompression(file, { maxWidthOrHeight: 1920, fileType: 'image/webp', initialQuality: 0.9 }),
+          imageCompression(file, { maxWidthOrHeight: 800, fileType: 'image/webp', initialQuality: 0.8 })
+        ])
 
         await Promise.all([
-          uploadPoza(file, galerieActiva.id, user.uid, (p) => reportProgress(i * 2, p), origPath),
-          uploadPoza(thumbFile, galerieActiva.id, user.uid, (p) => reportProgress(i * 2 + 1, p), thumbPath)
+          uploadPoza(file, galerieActiva.id, user.uid, (p) => reportProgress(i * 3, p), origPath),
+          uploadPoza(mediumFile, galerieActiva.id, user.uid, (p) => reportProgress(i * 3 + 1, p), mediumPath),
+          uploadPoza(thumbFile, galerieActiva.id, user.uid, (p) => reportProgress(i * 3 + 2, p), thumbPath)
         ])
       }
       await handleDeschideGalerie(galerieActiva)
@@ -276,7 +273,11 @@ function Dashboard({ user, onLogout, initialTab }) {
   const renderSidebar = () => (
     <div className="dashboard-sidebar">
       <div className="sidebar-logo-area">
-        <h1 className="dashboard-logo" onClick={() => { setGalerieActiva(null); setActiveTab('galerii') }}>
+        <h1 className="dashboard-logo" onClick={() => {
+          setGalerieActiva(null)
+          if (location.pathname === '/settings') navigate('/dashboard?tab=galerii')
+          else setSearchParams({ tab: 'galerii' })
+        }}>
           Fotolio
         </h1>
       </div>
@@ -286,9 +287,9 @@ function Dashboard({ user, onLogout, initialTab }) {
           type="button"
           className={`dashboard-sidebar-btn ${activeTab === key ? 'active' : ''}`}
           onClick={() => {
-            setActiveTab(key)
             if (key === 'setari') navigate('/settings')
-            else if (location.pathname === '/settings') navigate('/dashboard')
+            else if (location.pathname === '/settings') navigate(`/dashboard?tab=${key}`)
+            else setSearchParams({ tab: key })
           }}
         >
           <span className="dashboard-sidebar-btn-indicator" />

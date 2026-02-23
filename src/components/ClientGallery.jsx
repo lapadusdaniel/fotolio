@@ -15,6 +15,17 @@ const INITIAL_VISIBLE = 24;
 
 const urlCache = new Map();
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 function LazyGalleryImage({ pozaKey, index, isFav, onFavoriteClick, onClick, accentColor }) {
   const [url, setUrl] = useState(() => urlCache.get(`thumb:${pozaKey}`) || null);
 
@@ -95,6 +106,21 @@ const normalizeUrl = (url) => {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 };
 
+/** Parse expiryDate (Firebase Timestamp or ISO string) and return Date or null */
+function parseExpiryDate(val) {
+  if (val == null) return null;
+  if (typeof val?.toDate === 'function') return val.toDate();
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/** Returns true if gallery has an expiryDate and current date is strictly past it */
+function isGalleryExpired(galleryData) {
+  const expiryDate = parseExpiryDate(galleryData?.expiryDate ?? galleryData?.dataExpirare);
+  if (!expiryDate) return false;
+  return new Date() > expiryDate;
+}
+
 function LightboxFavoriteButton({ galerie, pozeAfisate, onFavoriteClick, accentColor }) {
   const { currentIndex } = useLightboxState();
   const poza = pozeAfisate[currentIndex];
@@ -162,6 +188,7 @@ function LightboxDownloadButton({ pozeAfisate, originalUrls }) {
 const ClientGallery = () => {
   const { slug, id: galleryId } = useParams();
   const navigate = useNavigate();
+  const isMobile = useIsMobile(768);
 
   useEffect(() => {
     if (!slug && !galleryId) { navigate('/', { replace: true }); }
@@ -173,6 +200,7 @@ const ClientGallery = () => {
   const [coverOriginalUrl, setCoverOriginalUrl] = useState(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [lightboxOriginalUrls, setLightboxOriginalUrls] = useState({});
+  const [lightboxMediumUrls, setLightboxMediumUrls] = useState({});
   const [loading, setLoading] = useState(true);
   const [eroare, setEroare] = useState(null);
   const loadMoreRef = useRef(null);
@@ -221,7 +249,6 @@ const ClientGallery = () => {
         const acum = new Date();
         if (dateGal.status === 'trash') throw new Error('Această galerie a fost ștearsă.');
         if (!dateGal.statusActiv) throw new Error('Această galerie este inactivă.');
-        if (dateGal.dataExpirare && new Date(dateGal.dataExpirare) < acum) throw new Error('Termenul galeriei a expirat.');
 
         setGalerie(dateGal);
 
@@ -287,7 +314,12 @@ const ClientGallery = () => {
     const indices = [lightboxIndex, lightboxIndex - 1, lightboxIndex + 1].filter((i) => i >= 0 && i < pozeAfisate.length);
     indices.forEach((i) => {
       const key = pozeAfisate[i].key;
-      if (!urlCache.get(`original:${key}`)) { getPozaUrl(key, 'original').then((url) => { urlCache.set(`original:${key}`, url); setLightboxOriginalUrls((prev) => ({ ...prev, [key]: url })); }).catch(() => {}); }
+      if (!urlCache.get(`medium:${key}`)) {
+        getPozaUrl(key, 'medium').then((url) => {
+          urlCache.set(`medium:${key}`, url);
+          setLightboxMediumUrls((prev) => ({ ...prev, [key]: url }));
+        }).catch(() => {});
+      }
       if (!urlCache.get(`thumb:${key}`)) { getPozaUrl(key, 'thumb').then((url) => urlCache.set(`thumb:${key}`, url)).catch(() => {}); }
     });
   }, [lightboxOpen, lightboxIndex, pozeAfisate]);
@@ -356,13 +388,16 @@ const ClientGallery = () => {
     setDownloadingAll(false);
   };
 
+  // Lightbox plugins — no Thumbnails on mobile (they stack vertically and break layout)
+  const lightboxPlugins = isMobile ? [Zoom] : [Zoom, Thumbnails];
+
   if (!slug && !galleryId) return null;
 
   // Loading state
   if (loading) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff', fontFamily: "'DM Sans', sans-serif" }}>
-        <p style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontStyle: 'italic', fontSize: '1.5rem', color: '#1d1d1f', margin: '0 0 12px' }}>Fotolio</p>
+        <p style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontStyle: 'italic', fontSize: '1.5rem', color: '#1d1d1f', margin: '0 0 12px' }}>Mina</p>
         <p style={{ fontSize: '13px', color: '#a1a1a6', fontWeight: 300 }}>Se încarcă galeria...</p>
       </div>
     );
@@ -371,7 +406,7 @@ const ClientGallery = () => {
   if (eroare) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f5f5f7', fontFamily: "'DM Sans', sans-serif", textAlign: 'center', padding: '40px' }}>
-        <p style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontStyle: 'italic', fontSize: '1.5rem', color: '#1d1d1f', margin: '0 0 16px' }}>Fotolio</p>
+        <p style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontStyle: 'italic', fontSize: '1.5rem', color: '#1d1d1f', margin: '0 0 16px' }}>Mina</p>
         <p style={{ fontSize: '15px', color: '#3a3a3c', fontWeight: 400, margin: '0 0 8px' }}>{eroare}</p>
         <button onClick={() => navigate('/')} style={{ marginTop: '20px', padding: '12px 28px', background: '#1d1d1f', color: '#fff', border: 'none', borderRadius: '100px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px' }}>Acasă</button>
       </div>
@@ -386,6 +421,7 @@ const ClientGallery = () => {
   const dataExpirareText = formatDate(galerie.dataExpirare);
   const favCount = galerie?.favorite?.length ?? 0;
   const limit = galerie?.limitSelectie ?? galerie?.maxSelectie;
+  const isExpired = isGalleryExpired(galerie);
 
   return (
     <div className="cg-root">
@@ -431,8 +467,24 @@ const ClientGallery = () => {
       </div>
 
       {/* ── MAIN ── */}
-      <div ref={contentRef} className={`cg-main ${coverVisible ? 'cg-main--hidden' : ''}`}>
+      <div ref={contentRef} className={`cg-main ${coverVisible ? 'cg-main--hidden' : ''}`} style={isExpired ? { position: 'relative' } : undefined}>
 
+        {isExpired ? (
+          <>
+            {coverImageUrl && (
+              <div className="cg-expired-bg" style={{ position: 'absolute', inset: 0, backgroundImage: `url(${coverImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(24px)', opacity: 0.4, zIndex: 0 }} aria-hidden="true" />
+            )}
+            <div className="cg-expired-fallback" style={{ position: 'relative', zIndex: 1, minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '48px 24px' }}>
+              <p className="cg-expired-title" style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 'clamp(1.5rem, 4vw, 2.2rem)', fontWeight: 300, color: '#1d1d1f', margin: '0 0 12px', fontStyle: 'italic' }}>
+                This gallery has expired.
+              </p>
+              <p className="cg-expired-sub" style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.95rem', color: '#86868b', margin: 0, maxWidth: 340 }}>
+                Please contact your photographer to regain access.
+              </p>
+            </div>
+          </>
+        ) : (
+        <>
         {/* Sticky Toolbar */}
         <div className="cg-toolbar">
           {/* Stânga: Selecție */}
@@ -493,7 +545,7 @@ const ClientGallery = () => {
           ) : (
             <>
               <Masonry
-                breakpointCols={{ default: 3, 1100: 3, 768: 2, 480: 1 }}
+                breakpointCols={{ default: 3, 1100: 3, 900: 2, 600: 1 }}
                 className="cg-masonry"
                 columnClassName="cg-masonry-col"
               >
@@ -520,8 +572,15 @@ const ClientGallery = () => {
                 open={lightboxOpen}
                 close={() => setLightboxOpen(false)}
                 index={lightboxIndex}
-                slides={pozeAfisate.map((p) => ({ src: lightboxOriginalUrls[p.key] || urlCache.get(`original:${p.key}`) || urlCache.get(`thumb:${p.key}`) || '' }))}
-                plugins={[Zoom, Thumbnails]}
+                slides={pozeAfisate.map((p) => ({
+                  src: lightboxMediumUrls[p.key] || urlCache.get(`medium:${p.key}`) || urlCache.get(`thumb:${p.key}`) || '',
+                }))}
+                plugins={lightboxPlugins}
+                carousel={{ finite: false }}
+                render={{
+                  buttonPrev: isMobile ? () => null : undefined,
+                  buttonNext: isMobile ? () => null : undefined,
+                }}
                 toolbar={{
                   buttons: [
                     <LightboxSelectionCounter key="counter" galerie={galerie} accentColor={profile.accentColor} />,
@@ -534,6 +593,8 @@ const ClientGallery = () => {
             </>
           )}
         </div>
+        </>
+        )}
 
         {/* Footer Brand */}
         <footer className="cg-footer">
@@ -561,7 +622,7 @@ const ClientGallery = () => {
               )}
             </div>
           )}
-          <p className="cg-footer-copy">Galerie creată cu Fotolio</p>
+          <p className="cg-footer-copy">Galerie creată cu Mina</p>
         </footer>
       </div>
 
@@ -1060,10 +1121,10 @@ const ClientGallery = () => {
         }
         .cg-count-pop { animation: selectionCounterPop 0.4s ease-out; }
 
-        /* ── Mobile ── */
-        @media (max-width: 768px) {
+        /* ── Tablet ── */
+        @media (max-width: 900px) {
           .cg-toolbar { padding: 0 20px; gap: 12px; height: 48px; }
-          .cg-gallery { padding: 32px 20px 0; }
+          .cg-gallery { padding: 32px 16px 0; }
           .cg-footer { padding: 48px 20px 40px; }
           .cg-toolbar-expire { display: none; }
           .cg-masonry { margin-left: -10px; }
@@ -1071,11 +1132,34 @@ const ClientGallery = () => {
           .cg-masonry-col > div { margin-bottom: 10px; }
         }
 
-        @media (max-width: 480px) {
-          .cg-cover-title { font-size: 2.2rem; }
+        /* ── Mobile ── */
+        @media (max-width: 600px) {
+          .cg-cover-title { font-size: 2rem; }
           .cg-cover-btn { font-size: 14px; padding: 11px 22px; }
+          .cg-cover-overlay { padding: 24px 20px 32px; }
+          .cg-toolbar { padding: 0 14px; height: 46px; }
           .cg-toolbar-btn span { display: none; }
-          .cg-item-overlay { opacity: 0.9; }
+          .cg-toolbar-download span { display: none; }
+          .cg-toolbar-download { padding: 8px 12px; }
+          .cg-gallery { padding: 20px 12px 0; }
+          .cg-masonry { margin-left: -8px; }
+          .cg-masonry-col { padding-left: 8px; }
+          .cg-masonry-col > div { margin-bottom: 8px; }
+          .cg-item { border-radius: 4px; }
+          .cg-item-overlay { opacity: 1; background: linear-gradient(to top, rgba(0,0,0,0.35) 0%, transparent 60%); }
+          .cg-action-btn { width: 36px; height: 36px; }
+          .cg-footer { padding: 40px 16px 32px; margin-top: 32px; }
+        }
+
+        /* ── Lightbox mobile overrides ── */
+        @media (max-width: 768px) {
+          .yarl__slide_image {
+            object-fit: contain !important;
+            max-height: 85vh !important;
+          }
+          .yarl__toolbar {
+            padding: 4px 8px !important;
+          }
         }
       `}</style>
     </div>

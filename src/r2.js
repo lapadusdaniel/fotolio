@@ -79,7 +79,8 @@ export const listPoze = async (galerieId, userId) => {
 /**
  * Resolve the storage path for a given key and type.
  * type 'thumb' -> galerii/{id}/thumbnails/{fileName}.webp
- * type 'original' or omit -> galerii/{id}/originals/{fileName} or legacy path
+ * type 'medium' -> galerii/{id}/medium/{fileName}.webp
+ * type 'original' or omit -> return key as is
  */
 function resolvePath(key, type) {
   if (!key) return null
@@ -87,16 +88,14 @@ function resolvePath(key, type) {
   const match = str.match(/^galerii\/([^/]+)\/originals\/(.+)$/)
   if (match) {
     const [, galerieId, fileName] = match
-    if (type === 'thumb') {
-      const base = fileName.replace(/\.[^.]+$/, '')
-      return `galerii/${galerieId}/thumbnails/${base}.webp`
-    }
-    return str
+    const base = fileName.replace(/\.[^.]+$/, '')
+    if (type === 'thumb') return `galerii/${galerieId}/thumbnails/${base}.webp`
+    if (type === 'medium') return `galerii/${galerieId}/medium/${base}.webp`
   }
   return str
 }
 
-export const getPozaUrl = async (fileName, type) => {
+export const getPozaUrl = async (fileName, type = 'original') => {
   if (!fileName) throw new Error('getPozaUrl: fileName este obligatoriu')
 
   const path = resolvePath(fileName, type)
@@ -169,7 +168,7 @@ export const deletePoza = async (fileName) => {
   await deleteOne(fileName)
 
   const thumbPath = resolvePath(fileName, 'thumb')
-  if (thumbPath && thumbPath !== fileName) {
-    await deleteOne(thumbPath).catch(() => {})
-  }
+  if (thumbPath && thumbPath !== fileName) await deleteOne(thumbPath).catch(() => {})
+  const mediumPath = resolvePath(fileName, 'medium')
+  if (mediumPath && mediumPath !== fileName) await deleteOne(mediumPath).catch(() => {})
 }
