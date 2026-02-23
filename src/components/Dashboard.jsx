@@ -422,7 +422,7 @@ function Dashboard({ user, onLogout, initialTab }) {
 
         {/* Tab Abonament */}
         {activeTab === 'abonament' && (
-          <div style={{ width: '100%', padding: '20px 40px' }}>
+          <div className="dashboard-subscription-wrap" style={{ width: '100%', padding: '20px 40px' }}>
             <SubscriptionSection user={user} userPlan={userPlan} storageLimit={storageLimit} checkAccess={checkAccess} />
           </div>
         )}
