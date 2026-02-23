@@ -8,7 +8,7 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, getDoc, updateDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { listPoze, getPozaUrl, getBrandingUrl } from '../r2';
 import Masonry from 'react-masonry-css';
-import { ChevronDown, Share2, Download, Heart, Clock, Instagram, MessageCircle } from 'lucide-react';
+import { ChevronDown, Share2, Download, Heart, Clock, Instagram, MessageCircle, Loader2 } from 'lucide-react';
 
 const BATCH_SIZE = 24;
 const INITIAL_VISIBLE = 24;
@@ -26,8 +26,20 @@ function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
+async function downloadOriginalImage(pozaKey, filename) {
+  const blobUrl = await getPozaUrl(pozaKey, 'original');
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename || pozaKey.split('/').pop() || 'image';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(blobUrl);
+}
+
 function LazyGalleryImage({ pozaKey, index, isFav, onFavoriteClick, onClick, accentColor }) {
   const [url, setUrl] = useState(() => urlCache.get(`thumb:${pozaKey}`) || null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (url) return;
@@ -41,23 +53,17 @@ function LazyGalleryImage({ pozaKey, index, isFav, onFavoriteClick, onClick, acc
     return () => { cancelled = true; };
   }, [pozaKey]);
 
-  const handleDownload = useCallback(() => {
-    const cached = urlCache.get(`original:${pozaKey}`);
-    if (cached) {
-      const link = document.createElement('a');
-      link.href = cached;
-      link.download = pozaKey.split('/').pop();
-      link.click();
-      return;
+  const handleDownload = useCallback(async () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await downloadOriginalImage(pozaKey, pozaKey.split('/').pop());
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDownloading(false);
     }
-    getPozaUrl(pozaKey, 'original').then((u) => {
-      urlCache.set(`original:${pozaKey}`, u);
-      const link = document.createElement('a');
-      link.href = u;
-      link.download = pozaKey.split('/').pop();
-      link.click();
-    });
-  }, [pozaKey]);
+  }, [pozaKey, isDownloading]);
 
   return (
     <div className="cg-item">
@@ -89,8 +95,9 @@ function LazyGalleryImage({ pozaKey, index, isFav, onFavoriteClick, onClick, acc
               className="cg-action-btn"
               aria-label="Download"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownload(); }}
+              disabled={isDownloading}
             >
-              <Download size={20} strokeWidth={1.5} />
+              {isDownloading ? <Loader2 size={20} strokeWidth={1.5} style={{ animation: 'cg-spin 0.8s linear infinite' }} /> : <Download size={20} strokeWidth={1.5} />}
             </button>
           </div>
         </div>
@@ -157,30 +164,34 @@ function LightboxSelectionCounter({ galerie, accentColor }) {
   );
 }
 
-function LightboxDownloadButton({ pozeAfisate, originalUrls }) {
+function LightboxDownloadButton({ pozeAfisate }) {
   const { currentIndex } = useLightboxState();
+  const [isDownloading, setIsDownloading] = useState(false);
   const poza = pozeAfisate[currentIndex];
   if (!poza) return null;
-  const getUrl = () => originalUrls?.[poza.key] || urlCache.get(`original:${poza.key}`);
+
+  const handleDownload = async () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await downloadOriginalImage(poza.key, poza.key?.split('/').pop() || poza.nume || 'image');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <button
       type="button"
       className="yarl__button"
-      onClick={() => {
-        let href = getUrl();
-        if (href) {
-          const link = document.createElement('a'); link.href = href; link.download = poza.key?.split('/').pop() || 'image'; link.click();
-        } else {
-          getPozaUrl(poza.key, 'original').then((u) => {
-            urlCache.set(`original:${poza.key}`, u);
-            const link = document.createElement('a'); link.href = u; link.download = poza.key?.split('/').pop() || 'image'; link.click();
-          });
-        }
-      }}
+      onClick={handleDownload}
+      disabled={isDownloading}
       aria-label="Download"
-      style={{ color: 'rgba(255,255,255,0.75)', background: 'none', border: 'none', cursor: 'pointer', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ color: 'rgba(255,255,255,0.75)', background: 'none', border: 'none', cursor: isDownloading ? 'wait' : 'pointer', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
     >
-      <Download size={22} strokeWidth={1.5} />
+      {isDownloading ? <Loader2 size={22} strokeWidth={1.5} style={{ animation: 'cg-spin 0.8s linear infinite' }} /> : <Download size={22} strokeWidth={1.5} />}
     </button>
   );
 }
@@ -377,11 +388,7 @@ const ClientGallery = () => {
     setDownloadingAll(true);
     for (const p of targets) {
       try {
-        let href = urlCache.get(`original:${p.key}`);
-        if (!href) href = await getPozaUrl(p.key, 'original');
-        if (href) urlCache.set(`original:${p.key}`, href);
-        const link = document.createElement('a'); link.href = href; link.download = p.key.split('/').pop();
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        await downloadOriginalImage(p.key, p.key.split('/').pop());
         await new Promise(r => setTimeout(r, 600));
       } catch (e) { console.error(e); }
     }
@@ -585,7 +592,7 @@ const ClientGallery = () => {
                   buttons: [
                     <LightboxSelectionCounter key="counter" galerie={galerie} accentColor={profile.accentColor} />,
                     <LightboxFavoriteButton key="fav" galerie={galerie} pozeAfisate={pozeAfisate} onFavoriteClick={handleFavoriteClick} accentColor={profile.accentColor} />,
-                    <LightboxDownloadButton key="dl" pozeAfisate={pozeAfisate} originalUrls={lightboxOriginalUrls} />,
+                    <LightboxDownloadButton key="dl" pozeAfisate={pozeAfisate} />,
                     'close',
                   ],
                 }}
@@ -1114,6 +1121,9 @@ const ClientGallery = () => {
         .cg-modal-btn--confirm:hover { background: #3a3a3c; }
 
         /* ── Animation ── */
+        @keyframes cg-spin {
+          to { transform: rotate(360deg); }
+        }
         @keyframes selectionCounterPop {
           0% { transform: scale(1); }
           50% { transform: scale(1.18); }
