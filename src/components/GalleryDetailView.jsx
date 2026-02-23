@@ -1,4 +1,8 @@
+import { useState } from 'react'
 import Masonry from 'react-masonry-css'
+import { doc, updateDoc, deleteField } from 'firebase/firestore'
+import { db } from '../firebase'
+import { toDateInputValue } from '../utils/galleryUtils'
 import AdminSelections from './AdminSelections'
 
 /**
@@ -16,6 +20,10 @@ export default function GalleryDetailView({
   onUploadPoze,
   onDeletePoza
 }) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [dataExpirare, setDataExpirare] = useState(() => toDateInputValue(galerie?.dataExpirare))
+  const [savingExpiry, setSavingExpiry] = useState(false)
+
   const masonryBreakpoints = {
     default: 4,
     1200: 3,
@@ -38,6 +46,13 @@ export default function GalleryDetailView({
           </div>
         </div>
         <div className="dashboard-header-actions">
+          <button
+            type="button"
+            onClick={() => { setSettingsOpen(true); setDataExpirare(toDateInputValue(galerie?.dataExpirare)); }}
+            className="dashboard-settings-btn"
+          >
+            Setări
+          </button>
           <button
             onClick={() => window.open(galerie.slug ? `/${galerie.slug}` : `/gallery/${galerie.id}`, '_blank')}
             className="dashboard-preview-btn"
@@ -103,6 +118,49 @@ export default function GalleryDetailView({
           </Masonry>
         )}
       </div>
+
+      {settingsOpen && (
+        <div className="dashboard-modal-overlay" onClick={() => setSettingsOpen(false)}>
+          <div className="dashboard-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="dashboard-modal-title">Setări galerie</h3>
+            <div className="dashboard-modal-field">
+              <label>Data expirare</label>
+              <input
+                type="date"
+                value={dataExpirare}
+                onChange={(e) => setDataExpirare(e.target.value)}
+                className="dashboard-modal-input"
+              />
+            </div>
+            <div className="dashboard-modal-actions">
+              <button type="button" className="btn-secondary" onClick={() => setSettingsOpen(false)}>
+                Anulează
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={savingExpiry}
+                onClick={async () => {
+                  setSavingExpiry(true)
+                  try {
+                    await updateDoc(doc(db, 'galerii', galerie.id), {
+                      dataExpirare: dataExpirare ? new Date(dataExpirare).toISOString() : deleteField()
+                    })
+                    setSettingsOpen(false)
+                  } catch (e) {
+                    console.error(e)
+                    alert('Eroare la salvare.')
+                  } finally {
+                    setSavingExpiry(false)
+                  }
+                }}
+              >
+                {savingExpiry ? 'Se salvează...' : 'Salvează'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

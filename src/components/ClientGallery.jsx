@@ -255,9 +255,10 @@ const ClientGallery = () => {
 
   const contentRef = useRef(null);
 
-  const formatDate = (isoString) => {
-    if (!isoString) return null;
-    const date = new Date(isoString);
+  const formatDate = (val) => {
+    if (!val) return null;
+    const date = typeof val?.toDate === 'function' ? val.toDate() : new Date(val);
+    if (isNaN(date.getTime())) return null;
     return date.toLocaleDateString('ro-RO', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
@@ -494,23 +495,14 @@ const ClientGallery = () => {
       </div>
 
       {/* ── MAIN ── */}
-      <div ref={contentRef} className={`cg-main ${coverVisible ? 'cg-main--hidden' : ''}`} style={isExpired ? { position: 'relative' } : undefined}>
+      <div ref={contentRef} className={`cg-main ${coverVisible ? 'cg-main--hidden' : ''}`}>
 
-        {isExpired ? (
-          <>
-            {coverImageUrl && (
-              <div className="cg-expired-bg" style={{ position: 'absolute', inset: 0, backgroundImage: `url(${coverImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(24px)', opacity: 0.4, zIndex: 0 }} aria-hidden="true" />
-            )}
-            <div className="cg-expired-fallback" style={{ position: 'relative', zIndex: 1, minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '48px 24px' }}>
-              <p className="cg-expired-title" style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 'clamp(1.5rem, 4vw, 2.2rem)', fontWeight: 300, color: '#1d1d1f', margin: '0 0 12px', fontStyle: 'italic' }}>
-                This gallery has expired.
-              </p>
-              <p className="cg-expired-sub" style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.95rem', color: '#86868b', margin: 0, maxWidth: 340 }}>
-                Please contact your photographer to regain access.
-              </p>
-            </div>
-          </>
-        ) : (
+        {isExpired && (
+          <div className="cg-expired-banner" role="alert">
+            Această galerie a expirat pe data de {dataExpirareText || 'dată necunoscută'}. Contactează fotograful pentru detalii.
+          </div>
+        )}
+
         <>
         {/* Sticky Toolbar */}
         <div className="cg-toolbar">
@@ -621,7 +613,6 @@ const ClientGallery = () => {
           )}
         </div>
         </>
-        )}
 
         {/* Footer Brand */}
         <footer className="cg-footer">
@@ -840,6 +831,19 @@ const ClientGallery = () => {
         }
         .cg-main--hidden {
           opacity: 0;
+        }
+        .cg-expired-banner {
+          position: sticky;
+          top: 0;
+          z-index: 50;
+          background: rgba(192, 57, 43, 0.12);
+          color: #c0392b;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          font-weight: 400;
+          text-align: center;
+          padding: 10px 20px;
+          border-bottom: 1px solid rgba(192, 57, 43, 0.2);
         }
 
         /* ── Toolbar ── */

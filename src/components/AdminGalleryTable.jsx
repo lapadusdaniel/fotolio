@@ -186,10 +186,15 @@ function GalleryRow({
       <div className="gallery-row-col gallery-row-col-stat gallery-row-col-date" data-label="Data Eveniment">
         <span className="gallery-stat-label">{dataEvenimentFormatted ? `📅 ${dataEvenimentFormatted}` : '—'}</span>
       </div>
-      <div className="gallery-row-col gallery-row-col-stat gallery-row-col-date" data-label="Data Expirare">
-        <span className={`gallery-stat-label ${isExpired ? 'gallery-stat-expired' : ''}`}>
-          {dataExpirareFormatted ? `⌛ Expiră: ${dataExpirareFormatted}` : '—'}
+      <div className="gallery-row-col gallery-row-col-stat gallery-row-col-date" data-label="Status">
+        <span className={`gallery-stat-status ${isExpired ? 'gallery-stat-status-expirat' : 'gallery-stat-status-activ'}`}>
+          {isExpired ? 'Expirat' : 'Activ'}
         </span>
+        {dataExpirareFormatted && (
+          <span className="gallery-stat-label" style={{ display: 'block', fontSize: '11px', color: '#86868b', marginTop: 2 }}>
+            {isExpired ? `Expirat: ${dataExpirareFormatted}` : `Expiră: ${dataExpirareFormatted}`}
+          </span>
+        )}
       </div>
       <div className="gallery-row-col gallery-row-col-actions" ref={menuRef}>
         {!isTrashView && (

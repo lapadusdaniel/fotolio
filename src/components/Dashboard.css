@@ -644,6 +644,24 @@
   font-weight: 400 !important;
 }
 
+.gallery-stat-status {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.gallery-stat-status-activ {
+  background: rgba(46, 125, 50, 0.12);
+  color: #2e7d32;
+}
+
+.gallery-stat-status-expirat {
+  background: rgba(192, 57, 43, 0.12);
+  color: #c0392b;
+}
+
 /* Activitate */
 .gallery-activity-stats {
   display: flex;
@@ -1219,6 +1237,24 @@
   border-color: rgba(184, 150, 90, 0.7);
 }
 
+.dashboard-settings-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: #3a3a3c;
+  padding: 6px 16px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dashboard-settings-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
 .dashboard-file-input-hidden {
   display: none;
 }
@@ -1442,6 +1478,69 @@
 
 .dashboard-selections-btn-download:hover:not(:disabled) {
   background: rgba(46, 125, 50, 0.05);
+}
+
+.dashboard-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dashboard-modal {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 420px;
+  width: 100%;
+  padding: 24px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.2);
+}
+
+.dashboard-modal-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #1d1d1f;
+  margin: 0 0 20px;
+}
+
+.dashboard-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.dashboard-modal-field label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: #3a3a3c;
+}
+
+.dashboard-modal-input {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  padding: 10px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  color: #1d1d1f;
+}
+
+.dashboard-modal-input:focus {
+  outline: none;
+  border-color: #b8965a;
+}
+
+.dashboard-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .dashboard-selection-preview-overlay {
@@ -1990,6 +2089,7 @@
     width: 100%;
   }
 
+  .dashboard-header-actions .dashboard-settings-btn,
   .dashboard-header-actions .dashboard-preview-btn,
   .dashboard-header-actions .dashboard-add-poze-btn,
   .dashboard-add-poze-btn {
