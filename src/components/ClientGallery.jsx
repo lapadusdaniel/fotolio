@@ -244,7 +244,6 @@ const ClientGallery = () => {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxDownloading, setLightboxDownloading] = useState(false);
   const [countPop, setCountPop] = useState(false);
-  const longPressTimer = useRef(null);
 
   const [numeSelectie, setNumeSelectie] = useState(localStorage.getItem('fotolio_nume_client') || '');
   const [doarFavorite, setDoarFavorite] = useState(false);
@@ -415,24 +414,6 @@ const ClientGallery = () => {
     }
     setDownloadingAll(false);
   };
-
-  const handleLightboxPointerDown = useCallback((slide) => {
-    longPressTimer.current = setTimeout(() => {
-      longPressTimer.current = null;
-      navigator.vibrate?.(50);
-      setLightboxDownloading(true);
-      downloadOriginalImage(slide.pozaKey, slide.pozaKey?.split('/').pop() || slide.pozaNume || 'image')
-        .catch((e) => console.error(e))
-        .finally(() => setLightboxDownloading(false));
-    }, 600);
-  }, []);
-
-  const handleLightboxPointerUpOrLeave = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  }, []);
 
   // Lightbox plugins — no Thumbnails on mobile (they stack vertically and break layout)
   const lightboxPlugins = isMobile ? [Zoom] : [Zoom, Thumbnails];
@@ -620,21 +601,9 @@ const ClientGallery = () => {
                 index={lightboxIndex}
                 slides={pozeAfisate.map((p) => ({
                   src: lightboxMediumUrls[p.key] || urlCache.get(`medium:${p.key}`) || urlCache.get(`thumb:${p.key}`) || '',
-                  pozaKey: p.key,
-                  pozaNume: p.nume,
                 }))}
                 plugins={lightboxPlugins}
-                carousel={{
-                  finite: false,
-                  imageProps: (slide) => ({
-                    onPointerDown: () => handleLightboxPointerDown(slide),
-                    onPointerUp: handleLightboxPointerUpOrLeave,
-                    onPointerLeave: handleLightboxPointerUpOrLeave,
-                    onPointerCancel: handleLightboxPointerUpOrLeave,
-                    onContextMenu: (e) => e.preventDefault(),
-                    style: { WebkitTouchCallout: 'none', userSelect: 'none', pointerEvents: 'auto' },
-                  }),
-                }}
+                carousel={{ finite: false }}
                 render={{
                   buttonPrev: isMobile ? () => null : undefined,
                   buttonNext: isMobile ? () => null : undefined,
