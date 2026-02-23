@@ -181,21 +181,23 @@ function LightboxSelectionCounter({ galerie, accentColor }) {
   );
 }
 
-function LightboxDownloadButton({ pozeAfisate }) {
+function LightboxDownloadButton({ pozeAfisate, isDownloading, setDownloading }) {
   const { currentIndex } = useLightboxState();
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [localDownloading, setLocalDownloading] = useState(false);
+  const downloading = isDownloading ?? localDownloading;
+  const setDownloadingState = setDownloading ?? setLocalDownloading;
   const poza = pozeAfisate[currentIndex];
   if (!poza) return null;
 
   const handleDownload = async () => {
-    if (isDownloading) return;
-    setIsDownloading(true);
+    if (downloading) return;
+    setDownloadingState(true);
     try {
       await downloadOriginalImage(poza.key, poza.key?.split('/').pop() || poza.nume || 'image');
     } catch (e) {
       console.error(e);
     } finally {
-      setIsDownloading(false);
+      setDownloadingState(false);
     }
   };
 
@@ -204,11 +206,11 @@ function LightboxDownloadButton({ pozeAfisate }) {
       type="button"
       className="yarl__button"
       onClick={handleDownload}
-      disabled={isDownloading}
+      disabled={downloading}
       aria-label="Download"
-      style={{ color: 'rgba(255,255,255,0.75)', background: 'none', border: 'none', cursor: isDownloading ? 'wait' : 'pointer', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ color: 'rgba(255,255,255,0.75)', background: 'none', border: 'none', cursor: downloading ? 'wait' : 'pointer', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
     >
-      {isDownloading ? <Loader2 size={22} strokeWidth={1.5} style={{ animation: 'cg-spin 0.8s linear infinite' }} /> : <Download size={22} strokeWidth={1.5} />}
+      {downloading ? <Loader2 size={22} strokeWidth={1.5} style={{ animation: 'cg-spin 0.8s linear infinite' }} /> : <Download size={22} strokeWidth={1.5} />}
     </button>
   );
 }
@@ -240,7 +242,9 @@ const ClientGallery = () => {
   const [pendingFavAction, setPendingFavAction] = useState(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxDownloading, setLightboxDownloading] = useState(false);
   const [countPop, setCountPop] = useState(false);
+  const longPressTimer = useRef(null);
 
   const [numeSelectie, setNumeSelectie] = useState(localStorage.getItem('fotolio_nume_client') || '');
   const [doarFavorite, setDoarFavorite] = useState(false);
@@ -411,6 +415,24 @@ const ClientGallery = () => {
     }
     setDownloadingAll(false);
   };
+
+  const handleLightboxPointerDown = useCallback((slide) => {
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
+      navigator.vibrate?.(50);
+      setLightboxDownloading(true);
+      downloadOriginalImage(slide.pozaKey, slide.pozaKey?.split('/').pop() || slide.pozaNume || 'image')
+        .catch((e) => console.error(e))
+        .finally(() => setLightboxDownloading(false));
+    }, 600);
+  }, []);
+
+  const handleLightboxPointerUpOrLeave = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
 
   // Lightbox plugins — no Thumbnails on mobile (they stack vertically and break layout)
   const lightboxPlugins = isMobile ? [Zoom] : [Zoom, Thumbnails];
@@ -598,9 +620,21 @@ const ClientGallery = () => {
                 index={lightboxIndex}
                 slides={pozeAfisate.map((p) => ({
                   src: lightboxMediumUrls[p.key] || urlCache.get(`medium:${p.key}`) || urlCache.get(`thumb:${p.key}`) || '',
+                  pozaKey: p.key,
+                  pozaNume: p.nume,
                 }))}
                 plugins={lightboxPlugins}
-                carousel={{ finite: false }}
+                carousel={{
+                  finite: false,
+                  imageProps: (slide) => ({
+                    onPointerDown: () => handleLightboxPointerDown(slide),
+                    onPointerUp: handleLightboxPointerUpOrLeave,
+                    onPointerLeave: handleLightboxPointerUpOrLeave,
+                    onPointerCancel: handleLightboxPointerUpOrLeave,
+                    onContextMenu: (e) => e.preventDefault(),
+                    style: { WebkitTouchCallout: 'none', userSelect: 'none', pointerEvents: 'auto' },
+                  }),
+                }}
                 render={{
                   buttonPrev: isMobile ? () => null : undefined,
                   buttonNext: isMobile ? () => null : undefined,
@@ -609,7 +643,7 @@ const ClientGallery = () => {
                   buttons: [
                     <LightboxSelectionCounter key="counter" galerie={galerie} accentColor={profile.accentColor} />,
                     <LightboxFavoriteButton key="fav" galerie={galerie} pozeAfisate={pozeAfisate} onFavoriteClick={handleFavoriteClick} accentColor={profile.accentColor} />,
-                    <LightboxDownloadButton key="dl" pozeAfisate={pozeAfisate} />,
+                    <LightboxDownloadButton key="dl" pozeAfisate={pozeAfisate} isDownloading={lightboxDownloading} setDownloading={setLightboxDownloading} />,
                     'close',
                   ],
                 }}
