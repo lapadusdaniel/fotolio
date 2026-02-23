@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { MoreVertical, Settings, Eye, Pin, Trash2, Link2, Share2, Archive, ArchiveRestore } from 'lucide-react'
 import { db } from '../firebase'
 import { doc, updateDoc } from 'firebase/firestore'
+import GallerySettingsModal from './GallerySettingsModal'
 import { listPoze, getPozaUrl } from '../r2'
 import { formatBytes, formatDateRO, CATEGORII_FILTRU } from '../utils/galleryUtils'
 import AdminGalleryForm from './AdminGalleryForm'
@@ -11,6 +12,16 @@ import './Dashboard.css'
 
 const PINNED_STORAGE_KEY = 'fotolio-pinned-galleries'
 const PLAN_LIMITS_GB = { Free: 15, Pro: 500, Unlimited: 1000 }
+const TRASH_AUTO_DELETE_DAYS = 30
+
+function getDaysUntilAutoDelete(deletedAt) {
+  if (!deletedAt) return null
+  const d = deletedAt?.toDate ? deletedAt.toDate() : new Date(deletedAt)
+  if (isNaN(d.getTime())) return null
+  const now = new Date()
+  const daysSince = Math.floor((now - d) / 86400000)
+  return Math.max(0, TRASH_AUTO_DELETE_DAYS - daysSince)
+}
 
 const IconViews = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -35,7 +46,7 @@ const IconSearch = () => (
 function GalleryRow({
   galerie, user, onDeschide, onMoveToTrash, onDeletePermanently, onRestore, onPreview,
   isPinned, onTogglePin, isTrashView, isArchivedView, isSelected, onToggleSelect,
-  onArchive, onUnarchive
+  onArchive, onUnarchive, onOpenSettings
 }) {
   const [coverUrl, setCoverUrl] = useState(null)
   const [totalSize, setTotalSize] = useState(0)
@@ -119,6 +130,7 @@ function GalleryRow({
   const dataExpirareRaw = galerie?.dataExpirare ?? galerie?.expiresAt ?? galerie?.dataExpirarii
   const dataExpirareFormatted = dataExpirareRaw ? formatDateRO(dataExpirareRaw) : null
   const isExpired = dataExpirareRaw ? new Date(dataExpirareRaw) < new Date() : false
+  const daysUntilAutoDelete = isTrashView ? getDaysUntilAutoDelete(galerie?.deletedAt) : null
 
   const showArchiveBtn = !isTrashView && !isArchivedView && onArchive
   const showUnarchiveInMenu = isArchivedView && onUnarchive
@@ -186,14 +198,24 @@ function GalleryRow({
       <div className="gallery-row-col gallery-row-col-stat gallery-row-col-date" data-label="Data Eveniment">
         <span className="gallery-stat-label">{dataEvenimentFormatted ? `📅 ${dataEvenimentFormatted}` : '—'}</span>
       </div>
-      <div className="gallery-row-col gallery-row-col-stat gallery-row-col-date" data-label="Status">
-        <span className={`gallery-stat-status ${isExpired ? 'gallery-stat-status-expirat' : 'gallery-stat-status-activ'}`}>
-          {isExpired ? 'Expirat' : 'Activ'}
-        </span>
-        {dataExpirareFormatted && (
-          <span className="gallery-stat-label" style={{ display: 'block', fontSize: '11px', color: '#86868b', marginTop: 2 }}>
-            {isExpired ? `Expirat: ${dataExpirareFormatted}` : `Expiră: ${dataExpirareFormatted}`}
+      <div className="gallery-row-col gallery-row-col-stat gallery-row-col-date" data-label={isTrashView ? 'Ștergere' : 'Status'}>
+        {isTrashView && daysUntilAutoDelete != null ? (
+          <span className="gallery-stat-label gallery-trash-days" title="Zile rămase până la ștergere automată recomandată">
+            {daysUntilAutoDelete > 0
+              ? `${daysUntilAutoDelete} zile până la ștergere`
+              : 'Expirat pentru ștergere'}
           </span>
+        ) : (
+          <>
+            <span className={`gallery-stat-status ${isExpired ? 'gallery-stat-status-expirat' : 'gallery-stat-status-activ'}`}>
+              {isExpired ? 'Expirat' : 'Activ'}
+            </span>
+            {dataExpirareFormatted && (
+              <span className="gallery-stat-label" style={{ display: 'block', fontSize: '11px', color: '#86868b', marginTop: 2 }}>
+                {isExpired ? `Expirat: ${dataExpirareFormatted}` : `Expiră: ${dataExpirareFormatted}`}
+              </span>
+            )}
+          </>
         )}
       </div>
       <div className="gallery-row-col gallery-row-col-actions" ref={menuRef}>
@@ -241,10 +263,10 @@ function GalleryRow({
             <button
               type="button"
               className="gallery-row-menu-item"
-              onClick={() => { setMenuOpen(false); console.log('Settings for gallery:', galerie?.id); }}
+              onClick={() => { setMenuOpen(false); onOpenSettings?.(galerie); }}
             >
               <Settings size={16} />
-              <span>Settings</span>
+              <span>Setări Galerie</span>
             </button>
             <button
               type="button"
@@ -328,6 +350,7 @@ export default function AdminGalleryTable({
       return []
     }
   })
+  const [settingsGalerie, setSettingsGalerie] = useState(null)
 
   const handleTogglePin = (galerieId) => {
     setPinnedGaleriiIds((prev) => {
@@ -622,6 +645,7 @@ export default function AdminGalleryTable({
                         onToggleSelect={handleToggleSelect}
                         onArchive={handleArchive}
                         onUnarchive={handleUnarchive}
+                        onOpenSettings={setSettingsGalerie}
                       />
                     ))}
                   </div>
@@ -649,6 +673,7 @@ export default function AdminGalleryTable({
                         onToggleSelect={activeTab === 'galerii' ? handleToggleSelect : undefined}
                         onArchive={handleArchive}
                         onUnarchive={handleUnarchive}
+                        onOpenSettings={setSettingsGalerie}
                       />
                     ))}
                   </div>
@@ -656,6 +681,12 @@ export default function AdminGalleryTable({
               )}
             </div>
           )}
+
+          <GallerySettingsModal
+            galerie={settingsGalerie}
+            open={!!settingsGalerie}
+            onClose={() => setSettingsGalerie(null)}
+          />
         </div>
       </div>
 

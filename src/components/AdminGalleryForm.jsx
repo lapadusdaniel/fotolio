@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import imageCompression from 'browser-image-compression'
-import { db } from '../firebase'
+import { auth, db } from '../firebase'
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore'
 import { uploadPoza } from '../r2'
 import { addMonths, toDateInputValue } from '../utils/galleryUtils'
@@ -75,6 +75,7 @@ export default function AdminGalleryForm({ user, onSuccess, onCancel, disabled, 
         }
 
         try {
+          const idToken = await auth.currentUser?.getIdToken()
           for (let i = 0; i < formFiles.length; i++) {
             const file = formFiles[i]
             const baseName = `${Date.now()}-${i}-${(file.name || 'image').replace(/[^a-zA-Z0-9.-]/g, '_')}`
@@ -91,8 +92,8 @@ export default function AdminGalleryForm({ user, onSuccess, onCancel, disabled, 
             })
 
             const [origResult] = await Promise.all([
-              uploadPoza(file, newGalerieId, user.uid, (p) => reportProgress(i * 2, p), origPath),
-              uploadPoza(thumbFile, newGalerieId, user.uid, (p) => reportProgress(i * 2 + 1, p), thumbPath)
+              uploadPoza(file, newGalerieId, user.uid, (p) => reportProgress(i * 2, p), origPath, idToken),
+              uploadPoza(thumbFile, newGalerieId, user.uid, (p) => reportProgress(i * 2 + 1, p), thumbPath, idToken)
             ])
             completedSteps += 2
             setFormUploadProgress(Math.round((completedSteps / totalSteps) * 100))

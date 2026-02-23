@@ -1,10 +1,11 @@
 const WORKER_URL = import.meta.env.VITE_R2_WORKER_URL
 const AUTH_TOKEN = import.meta.env.VITE_R2_AUTH_TOKEN
 
-/** Upload file to R2. If targetPath is provided, use it; otherwise use legacy userId/galerieId path. */
-export const uploadPoza = async (file, galerieId, userId, onProgress, targetPath) => {
+/** Upload file to R2. Requires Firebase idToken for Worker auth. */
+export const uploadPoza = async (file, galerieId, userId, onProgress, targetPath, idToken) => {
   const path = targetPath ?? `${userId}/${galerieId}/${Date.now()}-${file.name}`
   const url = `${WORKER_URL}${encodeURIComponent(path)}`
+  const auth = idToken ? `Bearer ${idToken}` : `Bearer ${AUTH_TOKEN}`
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -30,7 +31,7 @@ export const uploadPoza = async (file, galerieId, userId, onProgress, targetPath
 
     xhr.open('PUT', url)
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
-    xhr.setRequestHeader('Authorization', `Bearer ${AUTH_TOKEN}`)
+    xhr.setRequestHeader('Authorization', auth)
     xhr.send(file)
   })
 }
@@ -138,9 +139,10 @@ export const getPozaUrlOriginal = async (fileName) => {
   return URL.createObjectURL(blob)
 }
 
-/** Upload a file to a custom path. For branding assets (e.g. logo). */
-export const uploadToPath = async (file, path, onProgress) => {
+/** Upload a file to a custom path. Requires Firebase idToken for Worker auth. */
+export const uploadToPath = async (file, path, onProgress, idToken) => {
   const url = `${WORKER_URL}${encodeURIComponent(path)}`
+  const auth = idToken ? `Bearer ${idToken}` : `Bearer ${AUTH_TOKEN}`
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.upload.addEventListener('progress', (e) => {
@@ -153,7 +155,7 @@ export const uploadToPath = async (file, path, onProgress) => {
     xhr.addEventListener('error', () => reject(new Error('Upload failed: Network error')))
     xhr.open('PUT', url)
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
-    xhr.setRequestHeader('Authorization', `Bearer ${AUTH_TOKEN}`)
+    xhr.setRequestHeader('Authorization', auth)
     xhr.send(file)
   })
 }
@@ -168,12 +170,14 @@ export const getBrandingUrl = async (path) => {
   return URL.createObjectURL(blob)
 }
 
-export const deletePoza = async (fileName) => {
+/** Delete a single image (original + thumb + medium). Requires Firebase idToken. */
+export const deletePoza = async (fileName, idToken) => {
+  const auth = idToken ? `Bearer ${idToken}` : `Bearer ${AUTH_TOKEN}`
   const deleteOne = async (path) => {
     const url = `${WORKER_URL}${encodeURIComponent(path)}`
     const response = await fetch(url, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${AUTH_TOKEN}` }
+      headers: { Authorization: auth }
     })
     if (!response.ok) throw new Error(`Delete failed: ${response.status}`)
   }
@@ -184,4 +188,18 @@ export const deletePoza = async (fileName) => {
   if (thumbPath && thumbPath !== fileName) await deleteOne(thumbPath).catch(() => {})
   const mediumPath = resolvePath(fileName, 'medium')
   if (mediumPath && mediumPath !== fileName) await deleteOne(mediumPath).catch(() => {})
+}
+
+/** Bulk delete all R2 objects for a gallery (galerii/{galleryId}/). Requires Firebase idToken. */
+export const deleteGalleryFolder = async (galleryId, idToken) => {
+  const prefix = `galerii/${galleryId}/`
+  const url = `${WORKER_URL}?prefix=${encodeURIComponent(prefix)}`
+  const auth = idToken ? `Bearer ${idToken}` : `Bearer ${AUTH_TOKEN}`
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: { Authorization: auth }
+  })
+  if (!response.ok) throw new Error(`Bulk delete failed: ${response.status}`)
+  const data = await response.json().catch(() => ({}))
+  return data?.deleted ?? 0
 }

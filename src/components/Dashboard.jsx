@@ -5,7 +5,7 @@ import './Dashboard.css'
 import { auth, db } from '../firebase'
 import { signOut } from 'firebase/auth'
 import { collection, deleteDoc, doc, getDoc, setDoc, query, where, onSnapshot, updateDoc } from 'firebase/firestore'
-import { uploadPoza, listPoze, getPozaUrl, deletePoza } from '../r2'
+import { uploadPoza, listPoze, getPozaUrl, deletePoza, deleteGalleryFolder } from '../r2'
 import { useUserSubscription } from '../hooks/useUserSubscription'
 import { 
   Check,
@@ -141,6 +141,7 @@ function Dashboard({ user, onLogout, initialTab }) {
       setUploadProgress(Math.round(((stepIndex + percent / 100) / totalSteps) * 100))
     }
     try {
+      const idToken = await auth.currentUser?.getIdToken()
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         const baseName = `${Date.now()}-${i}-${(file.name || 'image').replace(/[^a-zA-Z0-9.-]/g, '_')}`
@@ -155,9 +156,9 @@ function Dashboard({ user, onLogout, initialTab }) {
         ])
 
         await Promise.all([
-          uploadPoza(file, galerieActiva.id, user.uid, (p) => reportProgress(i * 3, p), origPath),
-          uploadPoza(mediumFile, galerieActiva.id, user.uid, (p) => reportProgress(i * 3 + 1, p), mediumPath),
-          uploadPoza(thumbFile, galerieActiva.id, user.uid, (p) => reportProgress(i * 3 + 2, p), thumbPath)
+          uploadPoza(file, galerieActiva.id, user.uid, (p) => reportProgress(i * 3, p), origPath, idToken),
+          uploadPoza(mediumFile, galerieActiva.id, user.uid, (p) => reportProgress(i * 3 + 1, p), mediumPath, idToken),
+          uploadPoza(thumbFile, galerieActiva.id, user.uid, (p) => reportProgress(i * 3 + 2, p), thumbPath, idToken)
         ])
       }
       await handleDeschideGalerie(galerieActiva)
@@ -175,7 +176,8 @@ function Dashboard({ user, onLogout, initialTab }) {
   const handleDeletePoza = async (pozaKey) => {
     if (!window.confirm('Ștergi această poză?')) return
     try {
-      await deletePoza(pozaKey)
+      const idToken = await auth.currentUser?.getIdToken()
+      await deletePoza(pozaKey, idToken)
       setPozeGalerie((prev) => prev.filter((p) => p.key !== pozaKey))
     } catch (error) {
       console.error('Error:', error)
@@ -197,11 +199,14 @@ function Dashboard({ user, onLogout, initialTab }) {
   }
 
   const handleDeletePermanently = async (id) => {
-    if (!window.confirm('Această acțiune este ireversibilă. Ștergi definitiv?')) return
+    if (!window.confirm('Această acțiune va șterge definitiv toate fotografiile din stocarea Cloudflare și nu poate fi anulată. Ștergi definitiv?')) return
     try {
+      const idToken = await auth.currentUser?.getIdToken()
+      await deleteGalleryFolder(id, idToken)
       await deleteDoc(doc(db, 'galerii', id))
     } catch (error) {
       console.error('Error:', error)
+      alert('Eroare la ștergere definitivă. Încearcă din nou.')
     }
   }
 

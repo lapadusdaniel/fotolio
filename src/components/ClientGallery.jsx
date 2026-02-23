@@ -451,6 +451,16 @@ const ClientGallery = () => {
   const limit = galerie?.limitSelectie ?? galerie?.maxSelectie;
   const isExpired = isGalleryExpired(galerie);
 
+  if (isExpired) {
+    return (
+      <div className="cg-root">
+        <div className="cg-expired-block">
+          <p className="cg-expired-message">Această galerie a expirat. Contactează fotograful pentru reactivare.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="cg-root">
 
@@ -496,12 +506,6 @@ const ClientGallery = () => {
 
       {/* ── MAIN ── */}
       <div ref={contentRef} className={`cg-main ${coverVisible ? 'cg-main--hidden' : ''}`}>
-
-        {isExpired && (
-          <div className="cg-expired-banner" role="alert">
-            Această galerie a expirat pe data de {dataExpirareText || 'dată necunoscută'}. Contactează fotograful pentru detalii.
-          </div>
-        )}
 
         <>
         {/* Sticky Toolbar */}
@@ -832,18 +836,22 @@ const ClientGallery = () => {
         .cg-main--hidden {
           opacity: 0;
         }
-        .cg-expired-banner {
-          position: sticky;
-          top: 0;
-          z-index: 50;
-          background: rgba(192, 57, 43, 0.12);
-          color: #c0392b;
+        .cg-expired-block {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 48px 24px;
+          background: #f5f5f7;
+        }
+        .cg-expired-message {
           font-family: 'DM Sans', sans-serif;
-          font-size: 13px;
+          font-size: 1.1rem;
           font-weight: 400;
+          color: #3a3a3c;
           text-align: center;
-          padding: 10px 20px;
-          border-bottom: 1px solid rgba(192, 57, 43, 0.2);
+          margin: 0;
+          max-width: 360px;
         }
 
         /* ── Toolbar ── */

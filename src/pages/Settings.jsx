@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { db } from '../firebase'
+import { auth, db } from '../firebase'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { uploadToPath, getBrandingUrl } from '../r2'
 
@@ -83,7 +83,8 @@ export default function Settings({ user }) {
     setLogoUploading(true)
     try {
       const path = LOGO_PATH(user.uid)
-      await uploadToPath(file, path)
+      const idToken = await auth.currentUser?.getIdToken()
+      await uploadToPath(file, path, undefined, idToken)
       const blobUrl = await getBrandingUrl(path)
       setLogoPreview(blobUrl)
       setForm((p) => ({ ...p, logoUrl: path }))

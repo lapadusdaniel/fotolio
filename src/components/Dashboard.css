@@ -1238,6 +1238,9 @@
 }
 
 .dashboard-settings-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: 'DM Sans', sans-serif;
   font-size: 13px;
   font-weight: 400;
