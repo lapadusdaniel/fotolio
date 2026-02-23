@@ -4,7 +4,7 @@ import imageCompression from 'browser-image-compression'
 import './Dashboard.css'
 import { auth, db } from '../firebase'
 import { signOut } from 'firebase/auth'
-import { collection, deleteDoc, doc, getDoc, setDoc, query, where, onSnapshot, updateDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, query, where, onSnapshot, updateDoc, Timestamp } from 'firebase/firestore'
 import { uploadPoza, listPoze, getPozaUrl, deletePoza, deleteGalleryFolder } from '../r2'
 import { useUserSubscription } from '../hooks/useUserSubscription'
 import { 
@@ -75,6 +75,38 @@ function Dashboard({ user, onLogout, initialTab }) {
   const [profileSaving, setProfileSaving] = useState(false)
   
   const fileInputRef = useRef(null)
+
+  // Auto-cleanup: șterge galeriile din coș mai vechi de 7 zile (R2 + Firestore)
+  useEffect(() => {
+    if (!user?.uid) return
+    const run = async () => {
+      try {
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        const cutoff = Timestamp.fromDate(sevenDaysAgo)
+        const q = query(
+          collection(db, 'galerii'),
+          where('userId', '==', user.uid),
+          where('status', '==', 'trash'),
+          where('deletedAt', '<', cutoff)
+        )
+        const snap = await getDocs(q)
+        if (snap.empty) return
+        const idToken = await auth.currentUser?.getIdToken()
+        for (const d of snap.docs) {
+          try {
+            await deleteGalleryFolder(d.id, idToken)
+            await deleteDoc(doc(db, 'galerii', d.id))
+          } catch (e) {
+            console.warn('Trash cleanup failed for gallery', d.id, e)
+          }
+        }
+      } catch (e) {
+        console.warn('Trash cleanup query failed', e)
+      }
+    }
+    run()
+  }, [user?.uid])
 
   // Real-time listener pentru galerii
   useEffect(() => {
